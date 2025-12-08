@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Form, Input, Button, Select, Slider, InputNumber, message, Space, Typography, Spin, Modal, Tooltip, Alert, Grid } from 'antd';
 import { SettingOutlined, SaveOutlined, DeleteOutlined, ReloadOutlined, ArrowLeftOutlined, InfoCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, ThunderboltOutlined } from '@ant-design/icons';
@@ -32,6 +33,20 @@ export default function SettingsPage() {
     suggestions?: string[];
   } | null>(null);
   const [showTestResult, setShowTestResult] = useState(false);
+  const [customModelInput, setCustomModelInput] = useState(''); // cache manual typing for custom values
+
+  const ensureModelOptionExists = (
+    options: Array<{ value: string; label: string; description: string }>,
+    modelName?: string | null
+  ) => {
+    if (!modelName) {
+      return options;
+    }
+    if (options.some(option => option.value === modelName)) {
+      return options;
+    }
+    return [{ value: modelName, label: modelName, description: '' }, ...options];
+  };
 
   useEffect(() => {
     loadSettings();
@@ -42,6 +57,8 @@ export default function SettingsPage() {
     try {
       const settings = await settingsApi.getSettings();
       form.setFieldsValue(settings);
+      setModelOptions(prev => ensureModelOptionExists(prev, settings.llm_model));
+      setCustomModelInput('');
       
       // 判断是否为默认设置（id='0'表示来自.env的默认配置）
       if (settings.id === '0' || !settings.id) {
@@ -63,6 +80,8 @@ export default function SettingsPage() {
           temperature: 0.7,
           max_tokens: 2000,
         });
+        setModelOptions(prev => ensureModelOptionExists(prev, 'gpt-4'));
+        setCustomModelInput('');
       } else {
         message.error('加载设置失败');
       }
@@ -100,6 +119,8 @@ export default function SettingsPage() {
           temperature: 0.7,
           max_tokens: 2000,
         });
+        setModelOptions(prev => ensureModelOptionExists(prev, 'gpt-4'));
+        setCustomModelInput('');
         message.info('已重置为默认值，请点击保存');
       },
     });
@@ -119,6 +140,8 @@ export default function SettingsPage() {
           message.success('设置已删除');
           setHasSettings(false);
           form.resetFields();
+          setModelOptions([]);
+          setCustomModelInput('');
         } catch (error) {
           message.error('删除设置失败');
         } finally {
@@ -143,6 +166,7 @@ export default function SettingsPage() {
     // 清空模型列表，需要重新获取
     setModelOptions([]);
     setModelsFetched(false);
+    setCustomModelInput('');
   };
 
   const handleFetchModels = async (silent: boolean = false) => {
@@ -165,7 +189,12 @@ export default function SettingsPage() {
         provider: provider || 'openai'
       });
       
-      setModelOptions(response.models);
+      const normalizedModels = response.models || [];
+      const currentModel = form.getFieldValue('llm_model');
+      const mergedModels = currentModel && !normalizedModels.some(option => option.value === currentModel)
+        ? [{ value: currentModel, label: currentModel, description: '' }, ...normalizedModels]
+        : normalizedModels;
+      setModelOptions(mergedModels);
       setModelsFetched(true);
       if (!silent) {
         message.success(`成功获取 ${response.count || response.models.length} 个可用模型`);
@@ -186,6 +215,37 @@ export default function SettingsPage() {
     // 如果还没有获取过模型列表，自动获取
     if (!modelsFetched && !fetchingModels) {
       handleFetchModels(true); // silent模式，不显示成功消息
+    }
+  };
+
+  const commitCustomModelValue = () => {
+    const trimmedValue = customModelInput.trim();
+    if (!trimmedValue) {
+      return;
+    }
+    const currentValue = form.getFieldValue('llm_model');
+    if (currentValue !== trimmedValue) {
+      form.setFieldValue('llm_model', trimmedValue);
+    }
+    setModelOptions(prev => ensureModelOptionExists(prev, trimmedValue));
+    setCustomModelInput('');
+  };
+
+  const handleModelSearchChange = (value: string) => {
+    setCustomModelInput(value);
+  };
+
+  const handleModelInputBlur = () => {
+    if (!customModelInput.trim()) {
+      return;
+    }
+    commitCustomModelValue();
+  };
+
+  const handleModelInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitCustomModelValue();
     }
   };
 
@@ -414,6 +474,13 @@ export default function SettingsPage() {
                     showSearch
                     placeholder={isMobile ? "选择模型" : "输入模型名称或点击获取"}
                     optionFilterProp="label"
+                    onSearch={handleModelSearchChange}
+                    onBlur={handleModelInputBlur}
+                    onInputKeyDown={handleModelInputKeyDown}
+                    onChange={(value: string) => {
+                      setCustomModelInput('');
+                      form.setFieldValue('llm_model', value);
+                    }}
                     loading={fetchingModels}
                     onFocus={handleModelSelectFocus}
                     filterOption={(input, option) =>
