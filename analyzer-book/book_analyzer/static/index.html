@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Book Analyzer</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="logo">Book Analyzer</span>
+        <span class="logo-sub">MuMu AI Novel Lab</span>
+        <nav class="topbar-nav">
+          <a href="/docs" target="_blank" rel="noreferrer">API 文档</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel upload-panel">
+        <h2 class="panel-title">上传</h2>
+        <div class="drop-zone" id="dropZone">
+          <label class="drop-label" for="fileInput">
+            <input id="fileInput" type="file" accept=".txt,text/plain" />
+            <div class="drop-content">
+              <span class="drop-icon">📄</span>
+              <span class="drop-text">点击此处选择 TXT 文件或拖拽到此处</span>
+              <span class="drop-hint">支持 .txt，文件大小不超过 50MB</span>
+            </div>
+          </label>
+        </div>
+        <div id="fileMeta" class="file-meta hidden">尚未选择文件</div>
+        <pre id="filePreview" class="preview empty">文件预览会显示在这里。</pre>
+        <div class="upload-actions">
+          <button id="uploadButton" class="btn btn-primary" type="button" disabled>上传分析</button>
+          <span id="statusMessage" class="status-msg"></span>
+        </div>
+      </section>
+
+      <section class="panel list-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">书籍列表</h2>
+          <button id="refreshButton" class="btn btn-ghost" type="button">刷新</button>
+        </div>
+        <div id="bookList" class="book-list"></div>
+      </section>
+
+      <section class="panel detail-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">详情</h2>
+          <div class="detail-toolbar">
+            <button id="exportButton" class="btn btn-ghost" type="button" disabled>导出 JSON</button>
+            <button id="deleteButton" class="btn btn-danger" type="button" disabled>删除</button>
+          </div>
+        </div>
+        <div id="detailContent" class="detail-empty">请选择一本书查看详情。</div>
+        <form id="searchForm" class="search-bar">
+          <input id="searchInput" type="search" placeholder="在本书中搜索…" disabled />
+          <button id="searchButton" class="btn btn-primary" type="submit" disabled>搜索</button>
+        </form>
+        <div id="searchResults" class="search-results"></div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,1081 @@
+{
+  "version": 2,
+  "generatedAt": 1783531873608,
+  "entries": [
+    {
+      "id": "spec:project:architecture-constraints",
+      "type": "spec",
+      "title": "Architecture Constraints",
+      "summary": "# Architecture Constraints",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:44.827Z",
+      "updated": "2026-07-02T01:52:44.827Z",
+      "scope": "project",
+      "category": "arch",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/architecture-constraints.md"
+      }
+    },
+    {
+      "id": "spec:project:architecture-constraints-001",
+      "type": "spec",
+      "title": "Module Structure",
+      "summary": "- Type: monorepo - Key modules: - backend/ — Python FastAPI backend - frontend/ — React TypeScript frontend (Vite)",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:44.827Z",
+      "updated": "2026-07-02T01:52:44.827Z",
+      "scope": "project",
+      "category": "arch",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:architecture-constraints",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/architecture-constraints.md"
+      }
+    },
+    {
+      "id": "spec:project:architecture-constraints-002",
+      "type": "spec",
+      "title": "Backend Layer Boundaries",
+      "summary": "- `app/api/` — Route handlers (presentation layer) - `app/services/` — Business logic - `app/models/` — SQLAlchemy ORM models (data layer) - `app/middleware/` — FastAPI middleware (auth, request ID) - `app/mcp/` — Model Context Protocol plu",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:44.827Z",
+      "updated": "2026-07-02T01:52:44.827Z",
+      "scope": "project",
+      "category": "arch",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:architecture-constraints",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/architecture-constraints.md"
+      }
+    },
+    {
+      "id": "spec:project:architecture-constraints-003",
+      "type": "spec",
+      "title": "Dependency Rules",
+      "summary": "- api -> services -> models (top-down only, no circular imports) - services layer is the only layer that calls AI services (OpenAI/Anthropic) - Database session injected via FastAPI Depends()",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:44.827Z",
+      "updated": "2026-07-02T01:52:44.827Z",
+      "scope": "project",
+      "category": "arch",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:architecture-constraints",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/architecture-constraints.md"
+      }
+    },
+    {
+      "id": "spec:project:architecture-constraints-004",
+      "type": "spec",
+      "title": "Technology Constraints",
+      "summary": "- Runtime: Python >= 3.10 (backend), Node.js >= 18 (frontend) - Web framework: FastAPI 0.121 (backend), React 18 + Vite (frontend) - Database: PostgreSQL via SQLAlchemy 2.0 async - AI SDKs: openai 2.7, anthropic 0.72 - Vector DB: ChromaDB 1",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:44.827Z",
+      "updated": "2026-07-02T01:52:44.827Z",
+      "scope": "project",
+      "category": "arch",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:architecture-constraints",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/architecture-constraints.md"
+      }
+    },
+    {
+      "id": "spec:project:architecture-constraints-005",
+      "type": "spec",
+      "title": "Entries",
+      "summary": "{empty section for spec-add entries}",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:44.827Z",
+      "updated": "2026-07-02T01:52:44.827Z",
+      "scope": "project",
+      "category": "arch",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:architecture-constraints",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/architecture-constraints.md"
+      }
+    },
+    {
+      "id": "spec:project:coding-conventions",
+      "type": "spec",
+      "title": "Coding Conventions",
+      "summary": "# Coding Conventions",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:43.727Z",
+      "updated": "2026-07-02T01:52:43.727Z",
+      "scope": "project",
+      "category": "coding",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/coding-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:coding-conventions-001",
+      "type": "spec",
+      "title": "Formatting",
+      "summary": "- Indentation: 4 spaces (Python) - Line length: not configured - Trailing commas: no (Python) - Semicolons: no (Python)",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:43.727Z",
+      "updated": "2026-07-02T01:52:43.727Z",
+      "scope": "project",
+      "category": "coding",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:coding-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/coding-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:coding-conventions-002",
+      "type": "spec",
+      "title": "Naming",
+      "summary": "- Variables/functions: snake_case (Python), camelCase (TypeScript) - Classes/types: PascalCase (Python + TypeScript) - Constants: UPPER_SNAKE_CASE - Files: snake_case (Python), kebab-case (TypeScript)",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:43.727Z",
+      "updated": "2026-07-02T01:52:43.727Z",
+      "scope": "project",
+      "category": "coding",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:coding-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/coding-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:coding-conventions-003",
+      "type": "spec",
+      "title": "Imports",
+      "summary": "- Style: named imports - Order: standard library, third-party, local modules (Python) - Type hints: always used (Python 3.10+)",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:43.727Z",
+      "updated": "2026-07-02T01:52:43.727Z",
+      "scope": "project",
+      "category": "coding",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:coding-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/coding-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:coding-conventions-004",
+      "type": "spec",
+      "title": "Patterns",
+      "summary": "- FastAPI route handlers with APIRouter - SQLAlchemy async session pattern - Pydantic models for request/response validation - Service layer pattern (api -> service -> model) - BackgroundTasks for async operations",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:43.727Z",
+      "updated": "2026-07-02T01:52:43.727Z",
+      "scope": "project",
+      "category": "coding",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:coding-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/coding-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:coding-conventions-005",
+      "type": "spec",
+      "title": "Entries",
+      "summary": "{empty section for spec-add entries}",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:43.727Z",
+      "updated": "2026-07-02T01:52:43.727Z",
+      "scope": "project",
+      "category": "coding",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:coding-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/coding-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:debug-notes",
+      "type": "spec",
+      "title": "Debug Notes",
+      "summary": "# Debug Notes",
+      "tags": [
+        "debug",
+        "issue",
+        "workaround",
+        "root-cause",
+        "gotcha"
+      ],
+      "status": "active",
+      "created": "2026-07-02T04:05:32.089Z",
+      "updated": "2026-07-02T04:05:32.089Z",
+      "scope": "project",
+      "category": "debug",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/debug-notes.md"
+      }
+    },
+    {
+      "id": "spec:project:learnings",
+      "type": "spec",
+      "title": "Learnings",
+      "summary": "# Learnings",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:45.921Z",
+      "updated": "2026-07-02T01:52:45.921Z",
+      "scope": "project",
+      "category": "learning",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/learnings.md"
+      }
+    },
+    {
+      "id": "spec:project:learnings-001",
+      "type": "spec",
+      "title": "Entries",
+      "summary": "{empty -- entries added via spec-add}",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:52:45.921Z",
+      "updated": "2026-07-02T01:52:45.921Z",
+      "scope": "project",
+      "category": "learning",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:learnings",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/learnings.md"
+      }
+    },
+    {
+      "id": "spec:project:quality-rules",
+      "type": "spec",
+      "title": "Quality Rules",
+      "summary": "# Quality Rules",
+      "tags": [
+        "quality",
+        "lint",
+        "rule",
+        "enforcement"
+      ],
+      "status": "active",
+      "created": "2026-07-02T04:05:32.088Z",
+      "updated": "2026-07-02T04:05:32.088Z",
+      "scope": "project",
+      "category": "review",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/quality-rules.md"
+      }
+    },
+    {
+      "id": "spec:project:review-standards",
+      "type": "spec",
+      "title": "Review Standards",
+      "summary": "# Review Standards",
+      "tags": [
+        "review",
+        "checklist",
+        "gate",
+        "approval",
+        "standard"
+      ],
+      "status": "active",
+      "created": "2026-07-02T04:05:32.090Z",
+      "updated": "2026-07-02T04:05:32.090Z",
+      "scope": "project",
+      "category": "review",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/review-standards.md"
+      }
+    },
+    {
+      "id": "spec:project:test-conventions",
+      "type": "spec",
+      "title": "Test Conventions",
+      "summary": "# Test Conventions",
+      "tags": [
+        "test",
+        "coverage",
+        "mock",
+        "fixture",
+        "assertion",
+        "framework"
+      ],
+      "status": "active",
+      "created": "2026-07-02T04:05:32.089Z",
+      "updated": "2026-07-02T04:05:32.089Z",
+      "scope": "project",
+      "category": "test",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/test-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:ui-conventions",
+      "type": "spec",
+      "title": "UI Conventions",
+      "summary": "# UI Conventions",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:53:00.984Z",
+      "updated": "2026-07-02T01:53:00.984Z",
+      "scope": "project",
+      "category": "ui",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/ui-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:ui-conventions-001",
+      "type": "spec",
+      "title": "Framework",
+      "summary": "- React 18 with TypeScript - Build tool: Vite 7 - Routing: react-router-dom 6 - State management: Zustand 5 - UI library: Ant Design 5 (antd) + @ant-design/icons - HTTP client: axios - Drag and drop: react-beautiful-dnd",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:53:00.984Z",
+      "updated": "2026-07-02T01:53:00.984Z",
+      "scope": "project",
+      "category": "ui",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:ui-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/ui-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:ui-conventions-002",
+      "type": "spec",
+      "title": "Structure",
+      "summary": "- `src/pages/` — Page-level components - `src/components/` — Reusable UI components - `src/services/` — API service layer - `src/store/` — Zustand state stores - `src/types/` — TypeScript type definitions - `src/utils/` — Utility functions",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:53:00.984Z",
+      "updated": "2026-07-02T01:53:00.984Z",
+      "scope": "project",
+      "category": "ui",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:ui-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/ui-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:ui-conventions-003",
+      "type": "spec",
+      "title": "Build Output",
+      "summary": "- Build output: `backend/static/` (served by FastAPI)",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:53:00.984Z",
+      "updated": "2026-07-02T01:53:00.984Z",
+      "scope": "project",
+      "category": "ui",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:ui-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/ui-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:ui-conventions-004",
+      "type": "spec",
+      "title": "Development",
+      "summary": "- Dev server with proxy: `/api` -> `http://localhost:8000` - ESLint for linting",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:53:00.984Z",
+      "updated": "2026-07-02T01:53:00.984Z",
+      "scope": "project",
+      "category": "ui",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:ui-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/ui-conventions.md"
+      }
+    },
+    {
+      "id": "spec:project:ui-conventions-005",
+      "type": "spec",
+      "title": "Entries",
+      "summary": "{empty section for spec-add entries}",
+      "tags": [],
+      "status": "active",
+      "created": "2026-07-02T01:53:00.984Z",
+      "updated": "2026-07-02T01:53:00.984Z",
+      "scope": "project",
+      "category": "ui",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "spec:project:ui-conventions",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "specs/ui-conventions.md"
+      }
+    },
+    {
+      "id": "knowhow-rcp-20260702-build-workflow",
+      "type": "knowhow",
+      "title": "MuMuAINovel — Build workflow",
+      "summary": "# MuMuAINovel — Build workflow",
+      "tags": [
+        "workflow",
+        "build-workflow",
+        "vite",
+        "react",
+        "auto-generated"
+      ],
+      "status": "draft",
+      "created": "2026-07-02T01:53:15.098Z",
+      "updated": "2026-07-02T01:53:15.098Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-build-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-build-workflow-001",
+      "type": "knowhow",
+      "title": "Goal",
+      "summary": "Build the frontend for production deployment.",
+      "tags": [
+        "workflow",
+        "build-workflow",
+        "vite",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:15.098Z",
+      "updated": "2026-07-02T01:53:15.098Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-build-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-build-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-build-workflow-002",
+      "type": "knowhow",
+      "title": "Prerequisites",
+      "summary": "- Node.js >= 18 - Frontend dependencies installed: `cd frontend && npm install`",
+      "tags": [
+        "workflow",
+        "build-workflow",
+        "vite",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:15.098Z",
+      "updated": "2026-07-02T01:53:15.098Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-build-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-build-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-build-workflow-003",
+      "type": "knowhow",
+      "title": "Steps",
+      "summary": "1. `cd frontend` 2. `npm run build` (runs `tsc -b && vite build`)",
+      "tags": [
+        "workflow",
+        "build-workflow",
+        "vite",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:15.098Z",
+      "updated": "2026-07-02T01:53:15.098Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-build-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-build-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-build-workflow-004",
+      "type": "knowhow",
+      "title": "Expected Outcome",
+      "summary": "- Compiled frontend output in `backend/static/` directory - TypeScript type-checking passes - Vite produces optimized production bundle",
+      "tags": [
+        "workflow",
+        "build-workflow",
+        "vite",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:15.098Z",
+      "updated": "2026-07-02T01:53:15.098Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-build-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-build-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-build-workflow-005",
+      "type": "knowhow",
+      "title": "Related",
+      "summary": "- [[architecture-constraints]]",
+      "tags": [
+        "workflow",
+        "build-workflow",
+        "vite",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:15.098Z",
+      "updated": "2026-07-02T01:53:15.098Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-build-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-build-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-rcp-20260702-dev-workflow",
+      "type": "knowhow",
+      "title": "MuMuAINovel — Dev workflow",
+      "summary": "# MuMuAINovel — Dev workflow",
+      "tags": [
+        "workflow",
+        "dev-workflow",
+        "fastapi",
+        "vite",
+        "docker",
+        "auto-generated"
+      ],
+      "status": "draft",
+      "created": "2026-07-02T01:53:14.003Z",
+      "updated": "2026-07-02T01:53:14.004Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-dev-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-dev-workflow-001",
+      "type": "knowhow",
+      "title": "Goal",
+      "summary": "Start the full development environment with PostgreSQL, FastAPI backend, and React frontend.",
+      "tags": [
+        "workflow",
+        "dev-workflow",
+        "fastapi",
+        "vite",
+        "docker",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:14.003Z",
+      "updated": "2026-07-02T01:53:14.004Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-dev-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-dev-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-dev-workflow-002",
+      "type": "knowhow",
+      "title": "Prerequisites",
+      "summary": "- Node.js >= 18 - Python >= 3.10 - Docker (for PostgreSQL) - Install backend deps: `pip install -r backend/requirements.txt` - Install frontend deps: `cd frontend && npm install`",
+      "tags": [
+        "workflow",
+        "dev-workflow",
+        "fastapi",
+        "vite",
+        "docker",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:14.003Z",
+      "updated": "2026-07-02T01:53:14.004Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-dev-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-dev-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-dev-workflow-003",
+      "type": "knowhow",
+      "title": "Steps",
+      "summary": "1. Start PostgreSQL: `docker compose up -d postgres` 2. Start FastAPI backend: `cd backend && uvicorn app.main:app --reload --port 8000` 3. Start Vite frontend: `cd frontend && npm run dev` (serves on port 5173, proxies `/api` to `localhost",
+      "tags": [
+        "workflow",
+        "dev-workflow",
+        "fastapi",
+        "vite",
+        "docker",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:14.003Z",
+      "updated": "2026-07-02T01:53:14.004Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-dev-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-dev-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-dev-workflow-004",
+      "type": "knowhow",
+      "title": "Expected Outcome",
+      "summary": "- Backend API reachable at http://localhost:8000 - Frontend reachable at http://localhost:5173 with HMR active - API requests from frontend proxied to backend automatically",
+      "tags": [
+        "workflow",
+        "dev-workflow",
+        "fastapi",
+        "vite",
+        "docker",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:14.003Z",
+      "updated": "2026-07-02T01:53:14.004Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-dev-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-dev-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-dev-workflow-005",
+      "type": "knowhow",
+      "title": "Common Pitfalls",
+      "summary": "- PostgreSQL not ready: wait for health check, then start backend - Port conflicts: check if port 8000 or 5173 is already in use - Missing env vars: copy `backend/.env.example` to `backend/.env` and configure",
+      "tags": [
+        "workflow",
+        "dev-workflow",
+        "fastapi",
+        "vite",
+        "docker",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:14.003Z",
+      "updated": "2026-07-02T01:53:14.004Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-dev-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-dev-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-dev-workflow-006",
+      "type": "knowhow",
+      "title": "Related",
+      "summary": "- [[architecture-constraints]]",
+      "tags": [
+        "workflow",
+        "dev-workflow",
+        "fastapi",
+        "vite",
+        "docker",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:14.003Z",
+      "updated": "2026-07-02T01:53:14.004Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-dev-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-dev-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-rcp-20260702-lint-workflow",
+      "type": "knowhow",
+      "title": "MuMuAINovel — Lint workflow",
+      "summary": "# MuMuAINovel — Lint workflow",
+      "tags": [
+        "workflow",
+        "lint-workflow",
+        "eslint",
+        "react",
+        "auto-generated"
+      ],
+      "status": "draft",
+      "created": "2026-07-02T01:53:16.464Z",
+      "updated": "2026-07-02T01:53:16.468Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": null,
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-lint-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-lint-workflow-001",
+      "type": "knowhow",
+      "title": "Goal",
+      "summary": "Run the ESLint linter for the frontend codebase.",
+      "tags": [
+        "workflow",
+        "lint-workflow",
+        "eslint",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:16.464Z",
+      "updated": "2026-07-02T01:53:16.468Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-lint-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-lint-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-lint-workflow-002",
+      "type": "knowhow",
+      "title": "Prerequisites",
+      "summary": "- Node.js >= 18 - Frontend dependencies installed: `cd frontend && npm install`",
+      "tags": [
+        "workflow",
+        "lint-workflow",
+        "eslint",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:16.464Z",
+      "updated": "2026-07-02T01:53:16.468Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-lint-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-lint-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-lint-workflow-003",
+      "type": "knowhow",
+      "title": "Steps",
+      "summary": "1. `cd frontend` 2. `npm run lint` (runs `eslint .`)",
+      "tags": [
+        "workflow",
+        "lint-workflow",
+        "eslint",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:16.464Z",
+      "updated": "2026-07-02T01:53:16.468Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-lint-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-lint-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-lint-workflow-004",
+      "type": "knowhow",
+      "title": "Expected Outcome",
+      "summary": "- ESLint reports any code quality or style issues - Exit code 0 when no issues found",
+      "tags": [
+        "workflow",
+        "lint-workflow",
+        "eslint",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:16.464Z",
+      "updated": "2026-07-02T01:53:16.468Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-lint-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-lint-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-lint-workflow-005",
+      "type": "knowhow",
+      "title": "Common Pitfalls",
+      "summary": "- ESLint may report errors from generated or vendored files — check `.eslintignore` if needed",
+      "tags": [
+        "workflow",
+        "lint-workflow",
+        "eslint",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:16.464Z",
+      "updated": "2026-07-02T01:53:16.468Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-lint-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-lint-workflow.md"
+      }
+    },
+    {
+      "id": "knowhow-RCP-20260702-lint-workflow-006",
+      "type": "knowhow",
+      "title": "Related",
+      "summary": "- [[coding-conventions]]",
+      "tags": [
+        "workflow",
+        "lint-workflow",
+        "eslint",
+        "react",
+        "auto-generated"
+      ],
+      "status": "active",
+      "created": "2026-07-02T01:53:16.464Z",
+      "updated": "2026-07-02T01:53:16.468Z",
+      "scope": null,
+      "category": "recipe",
+      "specCategory": null,
+      "createdBy": null,
+      "sourceRef": null,
+      "parent": "knowhow-rcp-20260702-lint-workflow",
+      "related": [],
+      "source": {
+        "kind": "file",
+        "path": "knowhow/RCP-20260702-lint-workflow.md"
+      }
+    }
+  ]
+}

@@ -801,12 +801,20 @@ class PromptService:
             raise ValueError(f"缺少必需的参数: {e}")
     
     @classmethod
-    def get_denoising_prompt(cls, original_text: str) -> str:
+    def get_denoising_prompt(cls, original_text: str, corpus_highlight_passages: str = "") -> str:
         """获取AI去味提示词"""
-        return cls.format_prompt(
+        prompt = cls.format_prompt(
             cls.AI_DENOISING,
             original_text=original_text
         )
+        if corpus_highlight_passages:
+            prompt += (
+                "\n\n"
+                f"{corpus_highlight_passages}\n\n"
+                "请让上文的遣词节奏向参考范文靠拢，去 AI 味，"
+                "但必须保留原文情节、人物关系与设定。"
+            )
+        return prompt
     
     @classmethod
     def get_world_building_prompt(cls, title: str, theme: str, genre: str = "") -> str:
@@ -877,7 +885,8 @@ class PromptService:
                                       chapter_outline: str, style_content: str = "",
                                       target_word_count: int = 3000,
                                       memory_context: dict = None,
-                                      mcp_references: str = "") -> str:
+                                      mcp_references: str = "",
+                                      corpus_context: str = "") -> str:
         """
         获取章节完整创作提示词
         
@@ -907,6 +916,8 @@ class PromptService:
             mcp_text += "以下是通过MCP工具搜索到的相关参考资料，可用于丰富情节和细节：\n\n"
             mcp_text += mcp_references
             mcp_text += "\n"
+        if corpus_context:
+            mcp_text += "\n" + corpus_context + "\n"
         
         base_prompt = cls.format_prompt(
             cls.CHAPTER_GENERATION,
@@ -956,7 +967,8 @@ class PromptService:
                                                    style_content: str = "",
                                                    target_word_count: int = 3000,
                                                    memory_context: dict = None,
-                                                   mcp_references: str = "") -> str:
+                                                   mcp_references: str = "",
+                                                   corpus_context: str = "") -> str:
         """
         获取章节完整创作提示词（带前置章节上下文和记忆增强）
         
@@ -985,6 +997,8 @@ class PromptService:
             memory_text += "\n\n【📚 MCP工具搜索 - 参考资料】\n"
             memory_text += "以下是通过MCP工具搜索到的相关参考资料，可用于丰富情节和细节：\n\n"
             memory_text += mcp_references
+        if corpus_context:
+            memory_text += "\n\n" + corpus_context
         
         base_prompt = cls.format_prompt(
             cls.CHAPTER_GENERATION_WITH_CONTEXT,

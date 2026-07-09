@@ -71,7 +71,14 @@ class Settings(BaseSettings):
     default_model: str = "gpt-4"
     default_temperature: float = 0.7
     default_max_tokens: int = 2000
-    
+
+    # Embedding模型配置
+    embedding_provider: str = "local"  # "local" 本地模型 / "api" 外部API
+    embedding_dim: int = 384  # 输出向量维度（384/768/1024/4096等），仅api模式生效
+    embedding_api_url: Optional[str] = None  # 外部API地址，如 https://api.siliconflow.cn/v1/embeddings
+    embedding_api_key: Optional[str] = None  # 外部API密钥
+    embedding_api_model: str = "Qwen/Qwen3-VL-Embedding-8B"  # 外部API模型名
+
     # LinuxDO OAuth2 配置
     LINUXDO_CLIENT_ID: Optional[str] = None
     LINUXDO_CLIENT_SECRET: Optional[str] = None

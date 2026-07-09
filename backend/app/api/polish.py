@@ -6,9 +6,11 @@ from app.database import get_db
 from app.models.generation_history import GenerationHistory
 from app.schemas.polish import PolishRequest, PolishResponse
 from app.services.ai_service import AIService
+from app.services.corpus_bridge import CorpusBridge
 from app.services.prompt_service import prompt_service
 from app.logger import get_logger
-from app.api.settings import get_user_ai_service
+from app.api.settings import get_user_ai_service, require_login
+from app.user_manager import User
 
 router = APIRouter(prefix="/polish", tags=["AI去味"])
 logger = get_logger(__name__)
@@ -17,6 +19,7 @@ logger = get_logger(__name__)
 @router.post("", response_model=PolishResponse, summary="AI去味")
 async def polish_text(
     request: PolishRequest,
+    user: User = Depends(require_login),
     db: AsyncSession = Depends(get_db),
     user_ai_service: AIService = Depends(get_user_ai_service)
 ):
@@ -32,21 +35,28 @@ async def polish_text(
     这是本项目的核心特色功能！
     """
     try:
+        corpus_highlights = await CorpusBridge(
+            user.user_id,
+            db,
+        ).get_highlight_for_denoise(request.original_text, limit=5)
+
         # 构建AI去味提示词
         prompt = prompt_service.get_denoising_prompt(
-            original_text=request.original_text
+            original_text=request.original_text,
+            corpus_highlight_passages=corpus_highlights,
         )
         
         logger.info(f"开始AI去味处理，原文长度: {len(request.original_text)}")
         
         # 调用AI进行去味处理
-        polished_text = await ai_service.generate_text(
+        result = await user_ai_service.generate_text(
             prompt=prompt,
             provider=request.provider,
             model=request.model,
             temperature=request.temperature,
             max_tokens=len(request.original_text) * 2  # 预留足够token
         )
+        polished_text = result.get("content", "") if isinstance(result, dict) else str(result)
         
         # 计算字数
         word_count_before = len(request.original_text)
@@ -85,6 +95,7 @@ async def polish_batch(
     project_id: int = None,
     provider: str = None,
     model: str = None,
+    user: User = Depends(require_login),
     db: AsyncSession = Depends(get_db),
     user_ai_service: AIService = Depends(get_user_ai_service)
 ):
@@ -98,14 +109,22 @@ async def polish_batch(
         
         for idx, text in enumerate(texts):
             logger.info(f"处理第 {idx+1}/{len(texts)} 个文本")
-            
-            prompt = prompt_service.get_denoising_prompt(original_text=text)
-            
-            polished_text = await user_ai_service.generate_text(
+
+            corpus_highlights = await CorpusBridge(
+                user.user_id,
+                db,
+            ).get_highlight_for_denoise(text, limit=5)
+            prompt = prompt_service.get_denoising_prompt(
+                original_text=text,
+                corpus_highlight_passages=corpus_highlights,
+            )
+
+            result = await user_ai_service.generate_text(
                 prompt=prompt,
                 provider=provider,
                 model=model
             )
+            polished_text = result.get("content", "") if isinstance(result, dict) else str(result)
             
             results.append({
                 "index": idx,

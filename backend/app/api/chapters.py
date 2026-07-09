@@ -38,6 +38,7 @@ from app.services.ai_service import AIService
 from app.services.prompt_service import prompt_service
 from app.services.plot_analyzer import PlotAnalyzer
 from app.services.memory_service import memory_service
+from app.services.corpus_bridge import CorpusBridge
 from app.services.chapter_regenerator import ChapterRegenerator
 from app.logger import get_logger
 from app.api.settings import get_user_ai_service
@@ -1125,6 +1126,12 @@ async def generate_chapter_content_stream(
                         yield f"data: {json.dumps({'type': 'progress', 'message': '⚠️ MCP工具暂时不可用，使用基础模式', 'progress': 32}, ensure_ascii=False)}\n\n"
                 
                 # 根据是否有前置内容选择不同的提示词，并应用写作风格、记忆增强和MCP参考资料
+                chapter_outline_text = outline.content if outline else current_chapter.summary or '暂无大纲'
+                corpus_context = await CorpusBridge(current_user_id, db_session).get_reference_for_chapter(
+                    chapter_outline=chapter_outline_text,
+                    genre=project.genre or '',
+                    limit=5,
+                )
                 if previous_content:
                     prompt = prompt_service.get_chapter_generation_with_context_prompt(
                         title=project.title,
@@ -1140,11 +1147,12 @@ async def generate_chapter_content_stream(
                         previous_content=previous_content,
                         chapter_number=current_chapter.chapter_number,
                         chapter_title=current_chapter.title,
-                        chapter_outline=outline.content if outline else current_chapter.summary or '暂无大纲',
+                        chapter_outline=chapter_outline_text,
                         style_content=style_content,
                         target_word_count=target_word_count,
                         memory_context=memory_context,
-                        mcp_references=mcp_reference_materials
+                        mcp_references=mcp_reference_materials,
+                        corpus_context=corpus_context
                     )
                 else:
                     prompt = prompt_service.get_chapter_generation_prompt(
@@ -1160,11 +1168,12 @@ async def generate_chapter_content_stream(
                         outlines_context=outlines_context,
                         chapter_number=current_chapter.chapter_number,
                         chapter_title=current_chapter.title,
-                        chapter_outline=outline.content if outline else current_chapter.summary or '暂无大纲',
+                        chapter_outline=chapter_outline_text,
                         style_content=style_content,
                         target_word_count=target_word_count,
                         memory_context=memory_context,
-                        mcp_references=mcp_reference_materials
+                        mcp_references=mcp_reference_materials,
+                        corpus_context=corpus_context
                     )
                 
                 if mcp_reference_materials:
@@ -2222,6 +2231,12 @@ async def generate_single_chapter_for_batch(
     )
     
     # 生成提示词
+    chapter_outline_text = outline.content if outline else chapter.summary or '暂无大纲'
+    corpus_context = await CorpusBridge(user_id, db_session).get_reference_for_chapter(
+        chapter_outline=chapter_outline_text,
+        genre=project.genre or '',
+        limit=5,
+    )
     if previous_content:
         prompt = prompt_service.get_chapter_generation_with_context_prompt(
             title=project.title,
@@ -2237,10 +2252,11 @@ async def generate_single_chapter_for_batch(
             previous_content=previous_content,
             chapter_number=chapter.chapter_number,
             chapter_title=chapter.title,
-            chapter_outline=outline.content if outline else chapter.summary or '暂无大纲',
+            chapter_outline=chapter_outline_text,
             style_content=style_content,
             target_word_count=target_word_count,
-            memory_context=memory_context
+            memory_context=memory_context,
+            corpus_context=corpus_context
         )
     else:
         prompt = prompt_service.get_chapter_generation_prompt(
@@ -2256,10 +2272,11 @@ async def generate_single_chapter_for_batch(
             outlines_context=outlines_context,
             chapter_number=chapter.chapter_number,
             chapter_title=chapter.title,
-            chapter_outline=outline.content if outline else chapter.summary or '暂无大纲',
+            chapter_outline=chapter_outline_text,
             style_content=style_content,
             target_word_count=target_word_count,
-            memory_context=memory_context
+            memory_context=memory_context,
+            corpus_context=corpus_context
         )
     
     # 非流式生成内容
