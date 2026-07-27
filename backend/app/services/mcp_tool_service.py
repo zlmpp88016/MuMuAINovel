@@ -17,6 +17,10 @@ from app.logger import get_logger
 
 logger = get_logger(__name__)
 
+GLOBAL_MCP_USER_ID = "__global__"
+GLOBAL_READ_ONLY_CATEGORY = "corpus"
+GLOBAL_READ_ONLY_TOOL_PREFIX = "corpus_"
+
 
 @dataclass
 class ToolMetrics:
@@ -76,7 +80,7 @@ class MCPToolService:
         """
         初始化MCP工具服务
         
-        Args:
+        参数：
             cache_ttl_minutes: 工具缓存TTL（分钟，默认使用配置）
             max_retries: 最大重试次数（默认使用配置）
         """
@@ -109,49 +113,88 @@ class MCPToolService:
         """
         获取用户启用的MCP工具列表
         
-        Args:
+        参数：
             user_id: 用户ID
             db_session: 数据库会话
             category: 工具类别筛选（search/analysis/filesystem等）
         
-        Returns:
+        返回：
             工具定义列表，格式符合OpenAI Function Calling规范
         """
         try:
+            logger.info(
+                "🔧 [MCP调用][工具发现] 开始 | user_id=%s | category=%s",
+                user_id,
+                category or "全部",
+            )
             # 1. 查询用户启用的插件（enabled=True即可，不强制要求status=active）
             # 因为新启用的插件status可能还是inactive，需要给它机会被调用
             query = select(MCPPlugin).where(
-                MCPPlugin.user_id == user_id,
+                MCPPlugin.user_id.in_([user_id, GLOBAL_MCP_USER_ID]),
                 MCPPlugin.enabled == True
             )
             
-            if category:
-                query = query.where(MCPPlugin.category == category)
-            
             result = await db_session.execute(query)
-            plugins = result.scalars().all()
+            candidates = result.scalars().all()
+            plugins_by_name: Dict[str, MCPPlugin] = {}
+            for plugin in candidates:
+                is_global = plugin.user_id == GLOBAL_MCP_USER_ID
+                if is_global and plugin.category != GLOBAL_READ_ONLY_CATEGORY:
+                    continue
+                if category and plugin.category != category:
+                    continue
+                if is_global:
+                    plugins_by_name.setdefault(plugin.plugin_name, plugin)
+                else:
+                    plugins_by_name[plugin.plugin_name] = plugin
+            plugins = sorted(
+                plugins_by_name.values(),
+                key=lambda plugin: (plugin.sort_order or 0, plugin.plugin_name),
+            )
+            logger.info(
+                "🔧 [MCP调用][工具发现] 插件筛选完成 | 候选=%d | 可访问=%d | 插件=%s",
+                len(candidates),
+                len(plugins),
+                [plugin.plugin_name for plugin in plugins],
+            )
             
             if not plugins:
-                logger.info(f"用户 {user_id} 没有启用的MCP插件")
+                logger.info("🔧 [MCP调用][工具发现] 没有启用且可访问的 MCP 插件")
                 return []
             
             # 2. 获取所有工具定义（使用缓存）
             all_tools = []
             for plugin in plugins:
                 try:
+                    runtime_user_id = plugin.user_id
                     # 确保插件已加载到注册表
-                    if not mcp_registry.get_client(user_id, plugin.plugin_name):
-                        logger.info(f"插件 {plugin.plugin_name} 未加载，尝试加载...")
+                    if not mcp_registry.get_client(runtime_user_id, plugin.plugin_name):
+                        logger.info(
+                            "🔧 [MCP调用][插件加载] 开始 | 插件=%s | 作用域=%s",
+                            plugin.plugin_name,
+                            "全局" if runtime_user_id == GLOBAL_MCP_USER_ID else "用户",
+                        )
                         success = await mcp_registry.load_plugin(plugin)
                         if not success:
-                            logger.warning(f"插件 {plugin.plugin_name} 加载失败，跳过")
+                            logger.warning(
+                                "⚠️ [MCP调用][插件加载] 失败并跳过 | 插件=%s",
+                                plugin.plugin_name,
+                            )
                             continue
                     
                     # ✅ 使用缓存获取工具列表
                     plugin_tools = await self._get_plugin_tools_cached(
-                        user_id=user_id,
+                        user_id=runtime_user_id,
                         plugin_name=plugin.plugin_name
                     )
+                    if runtime_user_id == GLOBAL_MCP_USER_ID:
+                        plugin_tools = [
+                            tool
+                            for tool in plugin_tools
+                            if str(tool.get("name", "")).startswith(
+                                GLOBAL_READ_ONLY_TOOL_PREFIX
+                            )
+                        ]
                     
                     # 格式化为Function Calling格式
                     formatted_tools = self._format_tools_for_ai(
@@ -161,8 +204,10 @@ class MCPToolService:
                     all_tools.extend(formatted_tools)
                     
                     logger.info(
-                        f"从插件 {plugin.plugin_name} 加载了 "
-                        f"{len(formatted_tools)} 个工具"
+                        "✅ [MCP调用][工具发现] 插件=%s | 作用域=%s | 工具数=%d",
+                        plugin.plugin_name,
+                        "全局" if runtime_user_id == GLOBAL_MCP_USER_ID else "用户",
+                        len(formatted_tools),
                     )
                     
                 except Exception as e:
@@ -172,7 +217,14 @@ class MCPToolService:
                     )
                     continue
             
-            logger.info(f"用户 {user_id} 共加载 {len(all_tools)} 个MCP工具")
+            logger.info(
+                "✅ [MCP调用][工具发现] 完成 | 工具数=%d | 工具=%s",
+                len(all_tools),
+                [
+                    tool.get("function", {}).get("name", "unknown")
+                    for tool in all_tools
+                ],
+            )
             return all_tools
             
         except Exception as e:
@@ -187,11 +239,11 @@ class MCPToolService:
         """
         将MCP工具定义格式化为AI Function Calling格式
         
-        Args:
+        参数：
             plugin_tools: MCP插件的工具列表
             plugin_name: 插件名称
         
-        Returns:
+        返回：
             格式化后的工具列表
         """
         formatted_tools = []
@@ -221,11 +273,11 @@ class MCPToolService:
         """
         带缓存的工具列表获取
         
-        Args:
+        参数：
             user_id: 用户ID
             plugin_name: 插件名称
             
-        Returns:
+        返回：
             工具列表
         """
         cache_key = f"{user_id}:{plugin_name}"
@@ -262,7 +314,7 @@ class MCPToolService:
         """
         清理缓存
         
-        Args:
+        参数：
             user_id: 用户ID（可选，清理特定用户的缓存）
             plugin_name: 插件名称（可选，清理特定插件的缓存）
         """
@@ -296,13 +348,13 @@ class MCPToolService:
         """
         批量执行AI请求的工具调用（并行执行）
         
-        Args:
+        参数：
             user_id: 用户ID
             tool_calls: AI返回的工具调用列表
             db_session: 数据库会话
             timeout: 单个工具调用的超时时间（秒，默认使用配置）
         
-        Returns:
+        返回：
             工具调用结果列表
         """
         if not tool_calls:
@@ -311,14 +363,52 @@ class MCPToolService:
         # 使用配置的默认超时
         actual_timeout = timeout or mcp_config.TOOL_CALL_TIMEOUT_SECONDS
         
-        logger.info(f"开始执行 {len(tool_calls)} 个工具调用 (超时={actual_timeout}s)")
+        logger.info(
+            "🔧 [MCP调用][批量执行] 开始 | user_id=%s | 调用数=%d | "
+            "超时=%ss | 工具=%s",
+            user_id,
+            len(tool_calls),
+            actual_timeout,
+            [
+                tool_call.get("function", {}).get("name", "unknown")
+                for tool_call in tool_calls
+            ],
+        )
+
+        resolved_plugins: Dict[str, MCPPlugin | None] = {}
+        for tool_call in tool_calls:
+            function_name = tool_call.get("function", {}).get("name", "")
+            if "_" not in function_name:
+                continue
+            plugin_name = function_name.split("_", 1)[0]
+            if plugin_name not in resolved_plugins:
+                resolved_plugins[plugin_name] = await self._resolve_accessible_plugin(
+                    user_id=user_id,
+                    plugin_name=plugin_name,
+                    db_session=db_session,
+                )
+        logger.info(
+            "🔧 [MCP调用][权限解析] 完成 | 插件=%s",
+            {
+                name: (
+                    "无权限"
+                    if plugin is None
+                    else "全局"
+                    if plugin.user_id == GLOBAL_MCP_USER_ID
+                    else "用户"
+                )
+                for name, plugin in resolved_plugins.items()
+            },
+        )
         
         # 创建异步任务列表
         tasks = [
             self._execute_single_tool(
                 user_id=user_id,
                 tool_call=tool_call,
-                db_session=db_session,
+                plugin=resolved_plugins.get(
+                    tool_call.get("function", {}).get("name", "").split("_", 1)[0]
+                ),
                 timeout=actual_timeout
             )
             for tool_call in tool_calls
@@ -345,29 +435,38 @@ class MCPToolService:
             else:
                 formatted_results.append(result)
         
+        success_count = sum(
+            1 for result in formatted_results if result.get("success")
+        )
+        logger.info(
+            "✅ [MCP调用][批量执行] 完成 | 成功=%d | 失败=%d",
+            success_count,
+            len(formatted_results) - success_count,
+        )
         return formatted_results
     
     async def _execute_single_tool(
         self,
         user_id: str,
         tool_call: Dict[str, Any],
-        db_session: AsyncSession,
+        plugin: MCPPlugin | None,
         timeout: float
     ) -> Dict[str, Any]:
         """
         执行单个工具调用
         
-        Args:
+        参数：
             user_id: 用户ID
             tool_call: 工具调用信息
-            db_session: 数据库会话
+            plugin: 已按用户覆盖/全局回退规则解析的插件
             timeout: 超时时间
         
-        Returns:
+        返回：
             工具调用结果
         """
         tool_call_id = tool_call.get("id", "unknown")
         function_name = tool_call["function"]["name"]
+        start_time = time.time()
         
         try:
             # 解析插件名和工具名
@@ -383,18 +482,31 @@ class MCPToolService:
             else:
                 arguments = arguments_str
             
+            if plugin is None:
+                raise MCPToolServiceError("插件未启用或无权访问")
+            if (
+                plugin.user_id == GLOBAL_MCP_USER_ID
+                and not tool_name.startswith(GLOBAL_READ_ONLY_TOOL_PREFIX)
+            ):
+                raise MCPToolServiceError("全局插件只允许调用只读 corpus 工具")
+
             logger.info(
-                f"执行工具: {plugin_name}.{tool_name}, "
-                f"参数: {arguments}"
+                "🔧 [MCP调用][单工具] 开始 | call_id=%s | 工具=%s.%s | "
+                "作用域=%s | 参数字段=%s | 超时=%ss",
+                tool_call_id,
+                plugin_name,
+                tool_name,
+                "全局" if plugin.user_id == GLOBAL_MCP_USER_ID else "用户",
+                sorted(arguments),
+                timeout,
             )
             
             # ✅ 使用带重试的调用
             tool_key = f"{plugin_name}.{tool_name}"
-            start_time = time.time()
             
             try:
                 result = await self._call_tool_with_retry(
-                    user_id=user_id,
+                    user_id=plugin.user_id,
                     plugin_name=plugin_name,
                     tool_name=tool_name,
                     arguments=arguments,
@@ -406,8 +518,13 @@ class MCPToolService:
                 self._metrics[tool_key].update_success(duration_ms)
                 
                 logger.info(
-                    f"✅ 工具调用成功: {tool_key} "
-                    f"(耗时: {duration_ms:.2f}ms)"
+                    "✅ [MCP调用][单工具] 成功 | call_id=%s | 工具=%s | "
+                    "耗时=%.2fms | 结果类型=%s | 结果字符数=%d",
+                    tool_call_id,
+                    tool_key,
+                    duration_ms,
+                    type(result).__name__,
+                    len(json.dumps(result, ensure_ascii=False, default=str)),
                 )
                 
                 # 成功返回
@@ -424,6 +541,14 @@ class MCPToolService:
                 # 记录失败指标
                 duration_ms = (time.time() - start_time) * 1000
                 self._metrics[tool_key].update_failure(duration_ms)
+                logger.warning(
+                    "⚠️ [MCP调用][单工具] 超时 | call_id=%s | 工具=%s | "
+                    "耗时=%.2fms | 超时阈值=%ss",
+                    tool_call_id,
+                    tool_key,
+                    duration_ms,
+                    timeout,
+                )
                 raise MCPToolServiceError(
                     f"工具调用超时（>{timeout}秒）"
                 )
@@ -435,7 +560,13 @@ class MCPToolService:
             self._metrics[tool_key].update_failure(duration_ms)
             
             logger.error(
-                f"❌ 工具 {function_name} 调用失败: {e}",
+                "❌ [MCP调用][单工具] 失败 | call_id=%s | 工具=%s | "
+                "耗时=%.2fms | 错误类型=%s | 错误=%s",
+                tool_call_id,
+                function_name,
+                duration_ms,
+                type(e).__name__,
+                e,
                 exc_info=True
             )
             return {
@@ -446,6 +577,37 @@ class MCPToolService:
                 "success": False,
                 "error": str(e)
             }
+
+    async def _resolve_accessible_plugin(
+        self,
+        user_id: str,
+        plugin_name: str,
+        db_session: AsyncSession,
+    ) -> MCPPlugin | None:
+        """解析已启用的用户级覆盖插件或允许访问的全局语料库插件。"""
+        result = await db_session.execute(
+            select(MCPPlugin).where(
+                MCPPlugin.user_id.in_([user_id, GLOBAL_MCP_USER_ID]),
+                MCPPlugin.plugin_name == plugin_name,
+                MCPPlugin.enabled == True,
+            )
+        )
+        plugins = result.scalars().all()
+        user_plugin = next(
+            (plugin for plugin in plugins if plugin.user_id == user_id),
+            None,
+        )
+        if user_plugin is not None:
+            return user_plugin
+        return next(
+            (
+                plugin
+                for plugin in plugins
+                if plugin.user_id == GLOBAL_MCP_USER_ID
+                and plugin.category == GLOBAL_READ_ONLY_CATEGORY
+            ),
+            None,
+        )
     
     async def _call_tool_with_retry(
         self,
@@ -458,17 +620,17 @@ class MCPToolService:
         """
         带指数退避重试的工具调用
         
-        Args:
+        参数：
             user_id: 用户ID
             plugin_name: 插件名称
             tool_name: 工具名称
             arguments: 工具参数
             timeout: 超时时间
             
-        Returns:
+        返回：
             工具执行结果
             
-        Raises:
+        抛出：
             MCPToolServiceError: 工具调用失败
             asyncio.TimeoutError: 调用超时
         """
@@ -476,6 +638,16 @@ class MCPToolService:
         
         for attempt in range(self._max_retries):
             try:
+                logger.info(
+                    "🔧 [MCP调用][重试] 尝试 %d/%d | 工具=%s.%s | "
+                    "参数字段=%s | 超时=%ss",
+                    attempt + 1,
+                    self._max_retries,
+                    plugin_name,
+                    tool_name,
+                    sorted(arguments),
+                    timeout,
+                )
                 # 尝试调用工具
                 result = await asyncio.wait_for(
                     mcp_registry.call_tool(
@@ -497,6 +669,15 @@ class MCPToolService:
                 
             except asyncio.TimeoutError:
                 # 超时不重试，直接抛出
+                logger.warning(
+                    "⚠️ [MCP调用][重试] 调用超时，不再重试 | 工具=%s.%s | "
+                    "尝试=%d/%d | 超时=%ss",
+                    plugin_name,
+                    tool_name,
+                    attempt + 1,
+                    self._max_retries,
+                    timeout,
+                )
                 raise
                 
             except Exception as e:
@@ -533,10 +714,10 @@ class MCPToolService:
         """
         获取工具调用指标
         
-        Args:
+        参数：
             tool_name: 工具名称（可选，获取特定工具的指标）
             
-        Returns:
+        返回：
             指标字典
         """
         if tool_name:
@@ -595,22 +776,31 @@ class MCPToolService:
         """
         将工具调用结果格式化为上下文文本
         
-        Args:
+        参数：
             tool_results: 工具调用结果列表
             format: 输出格式（markdown/json/plain）
         
-        Returns:
+        返回：
             格式化的上下文字符串
         """
         if not tool_results:
+            logger.info("🔧 [MCP调用][上下文] 没有工具结果，返回空上下文")
             return ""
         
         if format == "markdown":
-            return self._build_markdown_context(tool_results)
+            context = self._build_markdown_context(tool_results)
         elif format == "json":
-            return json.dumps(tool_results, ensure_ascii=False, indent=2)
-        else:  # plain
-            return self._build_plain_context(tool_results)
+            context = json.dumps(tool_results, ensure_ascii=False, indent=2)
+        else:  # 纯文本格式
+            context = self._build_plain_context(tool_results)
+
+        logger.info(
+            "🔧 [MCP调用][上下文] 构建完成 | 格式=%s | 结果数=%d | 字符数=%d",
+            format,
+            len(tool_results),
+            len(context),
+        )
+        return context
     
     def _build_markdown_context(
         self,

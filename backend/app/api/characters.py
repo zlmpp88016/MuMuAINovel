@@ -19,6 +19,7 @@ from app.schemas.character import (
     CharacterGenerateRequest
 )
 from app.services.ai_service import AIService
+from app.services.corpus_bridge import CorpusBridge
 from app.services.prompt_service import prompt_service
 from app.logger import get_logger
 from app.api.settings import get_user_ai_service
@@ -27,19 +28,50 @@ router = APIRouter(prefix="/characters", tags=["角色管理"])
 logger = get_logger(__name__)
 
 
+async def _get_character_corpus_context(
+    request: CharacterGenerateRequest,
+    project: Project,
+    user_id: str,
+    db: AsyncSession,
+) -> str:
+    """加载可选的匿名角色原型上下文。"""
+    if not request.enable_mcp:
+        return ""
+    query = " ".join(
+        part
+        for part in (
+            project.genre or "",
+            request.role_type or "supporting",
+            request.background or "",
+            request.requirements or "",
+        )
+        if part
+    )
+    try:
+        bridge = CorpusBridge(user_id=user_id, db_session=db)
+        return await bridge.get_character_archetypes(
+            query=query,
+            genre=project.genre,
+            role_type=request.role_type,
+        )
+    except Exception as exc:
+        logger.warning("角色语料上下文获取失败，降级为基础模式: %s", type(exc).__name__)
+        return ""
+
+
 async def verify_project_access(project_id: str, user_id: str, db: AsyncSession) -> Project:
     """
     验证用户是否有权访问指定项目
     
-    Args:
+    参数：
         project_id: 项目ID
         user_id: 用户ID
         db: 数据库会话
         
-    Returns:
+    返回：
         Project: 项目对象
         
-    Raises:
+    抛出：
         HTTPException: 401 未登录，404 项目不存在或无权访问
     """
     if not user_id:
@@ -419,10 +451,18 @@ async def generate_character(
 - 其他要求：{request.requirements or '无'}
 """
         
+        corpus_context = await _get_character_corpus_context(
+            request=request,
+            project=project,
+            user_id=user_id,
+            db=db,
+        )
+
         # 使用统一的提示词服务
         prompt = prompt_service.get_single_character_prompt(
             project_context=project_context,
-            user_input=user_input
+            user_input=user_input,
+            corpus_context=corpus_context,
         )
         
         # 调用AI生成角色（支持MCP工具）
@@ -441,7 +481,7 @@ async def generate_character(
                 prompt=prompt,
                 user_id=user_id,
                 db_session=db,
-                enable_mcp=True,
+                enable_mcp=request.enable_mcp,
                 max_tool_rounds=2,
                 tool_choice="auto",
                 provider=None,  # 使用AIService初始化时的配置
@@ -797,10 +837,18 @@ async def generate_character_stream(
 """
             
             yield await SSEResponse.send_progress("构建AI提示词...", 20)
+
+            corpus_context = await _get_character_corpus_context(
+                request=request,
+                project=project,
+                user_id=user_id,
+                db=db,
+            )
             
             prompt = prompt_service.get_single_character_prompt(
                 project_context=project_context,
-                user_input=user_input
+                user_input=user_input,
+                corpus_context=corpus_context,
             )
             
             yield await SSEResponse.send_progress("调用AI服务生成角色...", 30)
@@ -811,7 +859,7 @@ async def generate_character_stream(
                     prompt=prompt,
                     user_id=user_id,
                     db_session=db,
-                    enable_mcp=True,
+                    enable_mcp=request.enable_mcp,
                     max_tool_rounds=2,
                     tool_choice="auto",
                     provider=None,

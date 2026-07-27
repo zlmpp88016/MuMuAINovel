@@ -100,7 +100,7 @@ class Settings:
     local_embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     fallback_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     chroma_collection_name: str = ""
-    mcp_host: str = "0.0.0.0"
+    mcp_host: str = "127.0.0.1"
     mcp_port: int = 8765
     batch_import_concurrency: int = 2
 
@@ -210,7 +210,7 @@ class Settings:
             chroma_collection_name=os.getenv(
                 "BOOK_ANALYZER_CHROMA_COLLECTION_NAME", ""
             ),
-            mcp_host=os.getenv("BOOK_ANALYZER_MCP_HOST", "0.0.0.0"),
+            mcp_host=os.getenv("BOOK_ANALYZER_MCP_HOST", "127.0.0.1"),
             mcp_port=int(os.getenv("BOOK_ANALYZER_MCP_PORT", "8765")),
             batch_import_concurrency=int(
                 os.getenv("BOOK_ANALYZER_BATCH_IMPORT_CONCURRENCY", "2")

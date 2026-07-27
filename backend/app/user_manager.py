@@ -56,14 +56,14 @@ class UserManager:
         """
         从 LinuxDO 用户信息创建或更新用户
         
-        Args:
+        参数：
             linuxdo_id: LinuxDO 用户 ID（本地用户时为 local_xxx 格式）
             username: 用户名
             display_name: 显示名称
             avatar_url: 头像 URL
             trust_level: 信任等级
             
-        Returns:
+        返回：
             用户对象
         """
         from app.models.user import User as UserModel
@@ -146,11 +146,11 @@ class UserManager:
         """
         设置用户的管理员权限
         
-        Args:
+        参数：
             user_id: 用户 ID
             is_admin: 是否为管理员
             
-        Returns:
+        返回：
             是否成功
         """
         from app.models.user import User as UserModel
@@ -183,10 +183,10 @@ class UserManager:
         """
         删除用户
         
-        Args:
+        参数：
             user_id: 用户 ID
             
-        Returns:
+        返回：
             是否成功
         """
         from app.models.user import User as UserModel

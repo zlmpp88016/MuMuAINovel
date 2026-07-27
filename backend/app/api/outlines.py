@@ -22,6 +22,7 @@ from app.schemas.outline import (
 from app.services.ai_service import AIService
 from app.services.prompt_service import prompt_service
 from app.services.memory_service import memory_service
+from app.services.corpus_bridge import CorpusBridge
 from app.logger import get_logger
 from app.api.settings import get_user_ai_service
 from app.utils.sse_response import SSEResponse, create_sse_response
@@ -30,19 +31,57 @@ router = APIRouter(prefix="/outlines", tags=["大纲管理"])
 logger = get_logger(__name__)
 
 
+async def _get_outline_corpus_context(
+    user_id: str,
+    db: AsyncSession,
+    genre: str,
+    theme: str,
+    plot_stage: str | None = None,
+    story_direction: str = "",
+) -> str:
+    """通过语料库桥接层加载可选的情节结构与伏笔技法。"""
+    query = " ".join(
+        part for part in (genre, theme, plot_stage or "", story_direction) if part
+    )
+    if not query:
+        return ""
+    bridge = CorpusBridge(user_id=user_id, db_session=db)
+    try:
+        plot_context = await bridge.get_plot_patterns(
+            query=query,
+            genre=genre,
+            plot_stage=plot_stage,
+        )
+        foreshadow_type = {
+            "opening": "plant",
+            "ending": "payoff",
+        }.get(plot_stage, "pair")
+        foreshadow_context = await bridge.get_foreshadow_patterns(
+            query=query,
+            pattern_type=foreshadow_type,
+            genre=genre,
+        )
+        return "\n".join(
+            context for context in (plot_context, foreshadow_context) if context
+        )
+    except Exception as exc:
+        logger.warning("大纲语料上下文获取失败，降级为基础模式: %s", type(exc).__name__)
+        return ""
+
+
 async def verify_project_access(project_id: str, user_id: str, db: AsyncSession) -> Project:
     """
     验证用户是否有权访问指定项目
     
-    Args:
+    参数：
         project_id: 项目ID
         user_id: 用户ID
         db: 数据库会话
         
-    Returns:
+    返回：
         Project: 项目对象
         
-    Raises:
+    抛出：
         HTTPException: 401 未登录，404 项目不存在或无权访问
     """
     if not user_id:
@@ -328,7 +367,8 @@ async def reorder_outlines(
                 await verify_project_access(first_outline.project_id, user_id, db)
         
         # 第一步：收集所有大纲和对应的章节
-        outline_chapter_map = {}  # {outline_id: (outline, chapter, old_order, new_order)}
+        # 映射结构：{outline_id: (outline, chapter, old_order, new_order)}
+        outline_chapter_map = {}
         
         for item in reorder_request.orders:
             outline_id = item.id
@@ -531,6 +571,15 @@ async def _generate_new_outline(
         except Exception as e:
             logger.warning(f"⚠️ MCP工具调用失败，继续使用常规模式: {str(e)}")
             mcp_reference_materials = ""
+
+    corpus_context = ""
+    if request.enable_mcp:
+        corpus_context = await _get_outline_corpus_context(
+            user_id=str(project.user_id or "system"),
+            db=db,
+            genre=request.genre or project.genre or "通用",
+            theme=request.theme or project.theme or "未设定",
+        )
     
     # 使用完整提示词（插入MCP参考资料）
     prompt = prompt_service.get_complete_outline_prompt(
@@ -546,7 +595,8 @@ async def _generate_new_outline(
         rules=project.world_rules or "未设定",
         characters_info=characters_info or "暂无角色信息",
         requirements=request.requirements or "",
-        mcp_references=mcp_reference_materials
+        mcp_references=mcp_reference_materials,
+        corpus_context=corpus_context,
     )
     
     # 调用AI生成大纲
@@ -608,12 +658,12 @@ async def _build_smart_outline_context(
     2. 近期概要：最近20章（标题+简要）
     3. 最近详细：最近2章（完整内容）
     
-    Args:
+    参数：
         latest_outlines: 所有已有大纲列表
         user_id: 用户ID
         project_id: 项目ID
         
-    Returns:
+    返回：
         包含压缩后上下文的字典
     """
     total_count = len(latest_outlines)
@@ -831,6 +881,17 @@ async def _continue_outline(
             except Exception as e:
                 logger.warning(f"⚠️ 第{batch_num + 1}批MCP工具调用失败，继续使用常规模式: {str(e)}")
                 mcp_reference_materials = ""
+
+        corpus_context = ""
+        if request.enable_mcp:
+            corpus_context = await _get_outline_corpus_context(
+                user_id=user_id,
+                db=db,
+                genre=request.genre or project.genre or "通用",
+                theme=request.theme or project.theme or "未设定",
+                plot_stage=request.plot_stage,
+                story_direction=request.story_direction or "自然延续",
+            )
         
         # 使用标准续写提示词模板（支持记忆+MCP增强）
         prompt = prompt_service.get_outline_continue_prompt(
@@ -852,7 +913,8 @@ async def _continue_outline(
             story_direction=request.story_direction or "自然延续",
             requirements=request.requirements or "",
             memory_context=memory_context,
-            mcp_references=mcp_reference_materials
+            mcp_references=mcp_reference_materials,
+            corpus_context=corpus_context,
         )
         
         # 调用AI生成当前批次
@@ -1079,6 +1141,15 @@ async def new_outline_generator(
                 logger.warning(f"⚠️ MCP工具调用失败，继续使用常规模式: {str(e)}")
                 mcp_reference_materials = ""
         
+        corpus_context = ""
+        if enable_mcp:
+            corpus_context = await _get_outline_corpus_context(
+                user_id=str(project.user_id or "system"),
+                db=db,
+                genre=data.get("genre") or project.genre or "通用",
+                theme=data.get("theme") or project.theme or "未设定",
+            )
+
         # 使用完整提示词（插入MCP参考资料）
         yield await SSEResponse.send_progress("准备AI提示词...", 20)
         prompt = prompt_service.get_complete_outline_prompt(
@@ -1094,7 +1165,8 @@ async def new_outline_generator(
             rules=project.world_rules or "未设定",
             characters_info=characters_info or "暂无角色信息",
             requirements=data.get("requirements") or "",
-            mcp_references=mcp_reference_materials
+            mcp_references=mcp_reference_materials,
+            corpus_context=corpus_context,
         )
         
         # 调用AI
@@ -1379,6 +1451,17 @@ async def continue_outline_generator(
                 except Exception as e:
                     logger.warning(f"⚠️ 第{batch_num + 1}批MCP工具调用失败，继续使用常规模式: {str(e)}")
                     mcp_reference_materials = ""
+
+            corpus_context = ""
+            if enable_mcp:
+                corpus_context = await _get_outline_corpus_context(
+                    user_id=user_id,
+                    db=db,
+                    genre=data.get("genre") or project.genre or "通用",
+                    theme=data.get("theme") or project.theme or "未设定",
+                    plot_stage=data.get("plot_stage", "development"),
+                    story_direction=data.get("story_direction", "自然延续"),
+                )
             
             
             yield await SSEResponse.send_progress(
@@ -1406,7 +1489,8 @@ async def continue_outline_generator(
                 story_direction=data.get("story_direction", "自然延续"),
                 requirements=data.get("requirements", ""),
                 memory_context=memory_context,
-                mcp_references=mcp_reference_materials
+                mcp_references=mcp_reference_materials,
+                corpus_context=corpus_context,
             )
             
             # 调用AI生成当前批次

@@ -23,7 +23,7 @@ class UvicornFormatter(logging.Formatter):
         """
         初始化格式化器
         
-        Args:
+        参数：
             use_colors: 是否使用颜色（控制台输出使用，文件输出不使用）
         """
         super().__init__()
@@ -44,9 +44,10 @@ class UvicornFormatter(logging.Formatter):
         request_id = getattr(record, 'request_id', None)
         request_id_str = f" [{request_id}]" if request_id else ""
         
-        # Uvicorn风格格式: INFO:     module_name - message [request_id]
+        # Uvicorn风格格式: 2026-01-01 12:00:00 INFO:     module_name - message [request_id]
         # 注意：INFO后面有5个空格，保持对齐
-        return f"{colored_level}:     {record.name}{request_id_str} - {record.getMessage()}"
+        timestamp = self.formatTime(record, "%Y-%m-%d %H:%M:%S")
+        return f"{timestamp} {colored_level}:     {record.name}{request_id_str} - {record.getMessage()}"
 
 
 # 全局标志，防止重复初始化
@@ -62,7 +63,7 @@ def setup_logging(
     """
     配置统一的 Uvicorn 风格日志系统
     
-    Args:
+    参数：
         level: 日志级别 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         log_to_file: 是否输出到文件
         log_file_path: 日志文件路径
@@ -149,10 +150,10 @@ def get_logger(name: str) -> logging.Logger:
     """
     获取指定名称的日志器
     
-    Args:
+    参数：
         name: 日志器名称，通常使用 __name__
         
-    Returns:
+    返回：
         配置好的日志器实例
     """
     return logging.getLogger(name)

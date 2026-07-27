@@ -30,11 +30,11 @@ class MCPTestService:
         """
         简单连接测试
         
-        Args:
+        参数：
             plugin: 插件配置
             user_id: 用户ID
             
-        Returns:
+        返回：
             测试结果
         """
         start_time = time.time()
@@ -99,12 +99,12 @@ class MCPTestService:
         """
         使用AI进行智能工具调用测试
         
-        Args:
+        参数：
             plugin: 插件配置
             user: 用户对象
             db_session: 数据库会话
             
-        Returns:
+        返回：
             测试结果
         """
         start_time = time.time()

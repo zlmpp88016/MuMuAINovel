@@ -40,12 +40,12 @@ class UserPasswordManager:
         """
         设置用户密码
         
-        Args:
+        参数：
             user_id: 用户ID
             username: 用户名
             password: 密码，如果为None则使用默认密码（username+@666）
             
-        Returns:
+        返回：
             实际使用的密码（明文，仅用于首次设置时返回给用户）
         """
         from app.models.user import UserPassword as UserPasswordModel
@@ -86,11 +86,11 @@ class UserPasswordManager:
         """
         验证用户密码
         
-        Args:
+        参数：
             user_id: 用户ID
             password: 待验证的密码
             
-        Returns:
+        返回：
             是否验证通过
         """
         from app.models.user import UserPassword as UserPasswordModel
@@ -111,10 +111,10 @@ class UserPasswordManager:
         """
         检查用户是否已设置密码
         
-        Args:
+        参数：
             user_id: 用户ID
             
-        Returns:
+        返回：
             是否已设置密码
         """
         from app.models.user import UserPassword as UserPasswordModel
@@ -131,10 +131,10 @@ class UserPasswordManager:
         """
         检查用户是否设置了自定义密码（非默认密码）
         
-        Args:
+        参数：
             user_id: 用户ID
             
-        Returns:
+        返回：
             是否使用自定义密码
         """
         from app.models.user import UserPassword as UserPasswordModel
@@ -154,10 +154,10 @@ class UserPasswordManager:
         """
         获取用户名
         
-        Args:
+        参数：
             user_id: 用户ID
             
-        Returns:
+        返回：
             用户名，如果不存在返回None
         """
         from app.models.user import UserPassword as UserPasswordModel

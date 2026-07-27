@@ -214,12 +214,12 @@ async def get_available_models(
     """
     从配置的 API 获取可用的模型列表
     
-    Args:
+    参数：
         api_key: API 密钥
         api_base_url: API 基础 URL
         provider: API 提供商 (openai, anthropic, azure, custom)
     
-    Returns:
+    返回：
         模型列表
     """
     try:
@@ -311,10 +311,10 @@ async def test_api_connection(data: ApiTestRequest):
     """
     测试 API 连接和配置是否正确
     
-    Args:
+    参数：
         data: 包含 API 配置的请求数据
     
-    Returns:
+    返回：
         测试结果包含状态、响应时间和详细信息
     """
     api_key = data.api_key
@@ -342,7 +342,7 @@ async def test_api_connection(data: ApiTestRequest):
         logger.info(f"🧪 开始测试 API 连接")
         logger.info(f"  - 提供商: {provider}")
         logger.info(f"  - 模型: {llm_model}")
-        logger.info(f"  - Base URL: {api_base_url}")
+        logger.info(f"  - 基础地址（Base URL）: {api_base_url}")
         
         response = await test_service.generate_text(
             prompt=test_prompt,

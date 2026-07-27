@@ -5,11 +5,21 @@ from typing import Optional
 
 class PolishRequest(BaseModel):
     """AI去味请求模型"""
-    original_text: str = Field(..., description="原始文本（AI生成的文本）")
-    project_id: Optional[int] = Field(None, description="项目ID（可选，用于记录历史）")
+    original_text: str = Field(
+        ...,
+        min_length=1,
+        max_length=50000,
+        description="原始文本（AI生成的文本）",
+    )
+    project_id: Optional[str] = Field(None, description="项目ID（可选，用于记录历史）")
     provider: Optional[str] = Field(None, description="AI提供商")
     model: Optional[str] = Field(None, description="AI模型")
-    temperature: Optional[float] = Field(0.8, description="温度参数，建议0.7-0.9")
+    temperature: Optional[float] = Field(
+        0.8,
+        ge=0,
+        le=2,
+        description="温度参数，建议0.7-0.9",
+    )
 
 
 class PolishResponse(BaseModel):

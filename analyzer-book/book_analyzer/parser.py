@@ -24,7 +24,7 @@ CHAPTER_HEADING_RE = re.compile(
 class Chapter:
     """解析后的章节。
 
-    Args:
+    参数：
         number: 章节序号，从 1 开始递增。
         title: 章节标题，未识别到标题时使用默认正文标题。
         content: 章节正文内容。
@@ -54,34 +54,61 @@ class Chunk:
     content: str
 
 
-def decode_text_file(raw_bytes: bytes) -> str:
-    """按常见中文小说编码顺序解码 TXT 字节。
+def decode_text_file(raw_bytes: bytes) -> tuple[str, str]:
+    """检测编码并解码为 UTF-8 文本，返回 (decoded_text, detected_encoding)。
 
-    Args:
+    优先用 chardet 检测真实编码，命中后解码并返回解码后文本和编码名。
+    chardet 不可用或低置信度时回退到按常见中文编码顺序尝试。
+
+    参数：
         raw_bytes: 上传文件的原始字节。
 
-    Returns:
-        解码后的文本。若常见编码都失败，则使用 UTF-8 替换非法字符。
+    返回：
+        ``(decoded_text, encoding_name)`` — text 始终可安全使用，encoding 用于日志/回显。
     """
+    detected = _detect_encoding(raw_bytes)
+    if detected:
+        try:
+            decoded = raw_bytes.decode(detected)
+            logger.info("chardet 检测编码: %s, 长度=%d 字符", detected, len(decoded))
+            return decoded, detected
+        except (UnicodeDecodeError, LookupError):
+            logger.warning("chardet 检测编码 %s 解码失败, 回退顺序尝试", detected)
+
     for encoding in ("utf-8-sig", "utf-8", "gb18030", "gbk", "big5"):
         try:
             decoded = raw_bytes.decode(encoding)
-            logger.info("文本解码成功: encoding=%s, 长度=%d 字符", encoding, len(decoded))
-            return decoded
+            logger.info("顺序尝试解码成功: encoding=%s, 长度=%d 字符", encoding, len(decoded))
+            return decoded, encoding
         except UnicodeDecodeError:
             continue
-    logger.warning("常见编码均解码失败, 使用 utf-8 replace fallback")
-    return raw_bytes.decode("utf-8", errors="replace")
+    logger.warning("常见编码均解码失败，使用 utf-8 替换模式兜底")
+    return raw_bytes.decode("utf-8", errors="replace"), "utf-8-replace"
+
+
+def _detect_encoding(raw_bytes: bytes) -> str | None:
+    try:
+        import chardet
+
+        result = chardet.detect(raw_bytes)
+        encoding = result.get("encoding")
+        confidence = result.get("confidence", 0)
+        if encoding and confidence >= 0.7:
+            return encoding
+        logger.info("chardet 置信度不足(%.2f), 跳过: encoding=%s", confidence, encoding)
+    except ImportError:
+        logger.debug("chardet 未安装, 跳过检测")
+    return None
 
 
 def parse_book_text(text: str, title_hint: str | None = None) -> ParsedBook:
     """将原始文本解析成书名和章节列表。
 
-    Args:
+    参数：
         text: 已解码的 TXT 文本。
         title_hint: 可选标题来源，通常是上传文件名。
 
-    Returns:
+    返回：
         包含书名、章节和全文正文的 ``ParsedBook``。
     """
     normalized = text.replace("\r\n", "\n").replace("\r", "\n").replace("\x00", "")
@@ -106,15 +133,15 @@ def chunk_chapters(
 ) -> list[Chunk]:
     """按固定长度和重叠区间切分章节内容。
 
-    Args:
+    参数：
         chapters: 待切分的章节列表。
         chunk_size: 单个 chunk 的最大字符数。
         overlap: 相邻 chunk 之间重复保留的字符数，用于减少断点信息丢失。
 
-    Returns:
+    返回：
         保留章节编号、标题和片段序号的 chunk 列表。
 
-    Raises:
+    抛出：
         ValueError: ``chunk_size`` 或 ``overlap`` 不合法。
     """
     if chunk_size <= 0:
@@ -166,7 +193,7 @@ def chunk_chapters(
 
 
 def filename_to_title(filename: str) -> str:
-    """Turn a filename into a clean display title."""
+    """将文件名转换为整洁的展示标题。"""
     return Path(filename).stem.strip() or "未命名书籍"
 
 

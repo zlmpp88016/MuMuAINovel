@@ -70,7 +70,7 @@ class RelationshipGraphNode(BaseModel):
     """关系图谱节点"""
     id: str
     name: str
-    type: str  # character / organization
+    type: str  # 节点类型：character / organization
     role_type: Optional[str] = None
     avatar: Optional[str] = None
 

@@ -44,13 +44,13 @@ class ImportExportService:
         """
         导出项目完整数据
         
-        Args:
+        参数：
             project_id: 项目ID
             db: 数据库会话
             include_generation_history: 是否包含生成历史
             include_writing_styles: 是否包含写作风格
             
-        Returns:
+        返回：
             ProjectExportData: 导出的项目数据
         """
         logger.info(f"开始导出项目: {project_id}")
@@ -366,10 +366,10 @@ class ImportExportService:
         """
         验证导入数据
         
-        Args:
+        参数：
             data: 导入的JSON数据
             
-        Returns:
+        返回：
             ImportValidationResult: 验证结果
         """
         errors = []
@@ -430,12 +430,12 @@ class ImportExportService:
         """
         导入项目数据（创建新项目）
         
-        Args:
+        参数：
             data: 导入的JSON数据
             db: 数据库会话
             user_id: 目标用户ID（导入后的项目归属）
             
-        Returns:
+        返回：
             ImportResult: 导入结果
         """
         warnings = []

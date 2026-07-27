@@ -16,11 +16,11 @@ class SSEResponse:
         """
         格式化SSE消息
         
-        Args:
+        参数：
             data: 要发送的数据字典
             event: 事件类型(可选)
             
-        Returns:
+        返回：
             格式化后的SSE消息字符串
         """
         message = ""
@@ -38,7 +38,7 @@ class SSEResponse:
         """
         发送进度消息
         
-        Args:
+        参数：
             message: 进度消息
             progress: 进度百分比(0-100)
             status: 状态(processing/success/error)
@@ -55,7 +55,7 @@ class SSEResponse:
         """
         发送内容块(用于流式输出AI生成内容)
         
-        Args:
+        参数：
             content: 内容块
         """
         return SSEResponse.format_sse({
@@ -68,7 +68,7 @@ class SSEResponse:
         """
         发送最终结果
         
-        Args:
+        参数：
             data: 结果数据
         """
         return SSEResponse.format_sse({
@@ -81,7 +81,7 @@ class SSEResponse:
         """
         发送错误消息
         
-        Args:
+        参数：
             error: 错误描述
             code: 错误码
         """
@@ -111,11 +111,11 @@ async def create_sse_generator(
     """
     创建SSE生成器包装器
     
-    Args:
+    参数：
         async_gen: 异步生成器
         show_progress: 是否显示进度
         
-    Yields:
+    生成：
         格式化的SSE消息
     """
     try:
@@ -152,10 +152,10 @@ def create_sse_response(generator: AsyncGenerator[str, None]) -> StreamingRespon
     """
     创建SSE StreamingResponse
     
-    Args:
+    参数：
         generator: SSE消息生成器
         
-    Returns:
+    返回：
         StreamingResponse对象
     """
     async def wrapper():

@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     debug: bool = True
     
     # 日志配置
-    log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    log_level: str = "INFO"  # 可选级别：DEBUG、INFO、WARNING、ERROR、CRITICAL
     log_to_file: bool = True  # 是否输出到文件
     log_file_path: str = str(PROJECT_ROOT / "logs" / "app.log")
     log_max_bytes: int = 10 * 1024 * 1024  # 10MB

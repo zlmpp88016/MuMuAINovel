@@ -1,5 +1,65 @@
 # MuMuAINovel 📚✨
 
+## ⚡ 本地一键启动
+
+首次运行时安装依赖：
+
+```powershell
+python -m pip install -r backend/requirements.txt
+python -m pip install -r analyzer-book/requirements.txt
+cd frontend
+npm install
+cd ..
+```
+
+在项目根目录启动全部服务：
+
+```powershell
+python start_services.py
+```
+
+### 不使用启动脚本
+
+分别打开 4 个 PowerShell 终端并执行：
+
+**终端 1：Book Analyzer MCP**
+
+```powershell
+cd analyzer-book
+python -m book_analyzer.mcp_server
+```
+
+**终端 2：Book Analyzer 管理服务**
+
+```powershell
+cd analyzer-book
+python -m uvicorn book_analyzer.main:app --host 127.0.0.1 --port 8002
+```
+
+**终端 3：Backend**
+
+```powershell
+cd backend
+python scripts/register_corpus_mcp_plugin.py --server-url http://127.0.0.1:8765/mcp
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+**终端 4：Frontend**
+
+```powershell
+cd frontend
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+- 前端：`http://127.0.0.1:5173`
+- Backend：`http://127.0.0.1:8000`
+- Book Analyzer：`http://127.0.0.1:8002`
+- MCP：`http://127.0.0.1:8765/mcp`
+
+按 `Ctrl+C` 可停止全部服务。
+
+---
+
 <div align="center">
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)

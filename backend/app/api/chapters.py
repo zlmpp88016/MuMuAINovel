@@ -42,6 +42,11 @@ from app.services.corpus_bridge import CorpusBridge
 from app.services.chapter_regenerator import ChapterRegenerator
 from app.logger import get_logger
 from app.api.settings import get_user_ai_service
+from app.utils.chapter_generation_logging import (
+    log_chapter_generation_step,
+    log_final_chapter_prompt,
+)
+from app.utils.chapter_prompt import append_one_time_prompt
 from app.utils.sse_response import create_sse_response
 
 router = APIRouter(prefix="/chapters", tags=["章节管理"])
@@ -55,15 +60,15 @@ async def verify_project_access(project_id: str, user_id: str, db: AsyncSession)
     """
     验证用户是否有权访问指定项目
     
-    Args:
+    参数：
         project_id: 项目ID
         user_id: 用户ID
         db: 数据库会话
         
-    Returns:
+    返回：
         Project: 项目对象
         
-    Raises:
+    抛出：
         HTTPException: 401 未登录，404 项目不存在或无权访问
     """
     if not user_id:
@@ -315,11 +320,11 @@ async def check_prerequisites(db: AsyncSession, chapter: Chapter) -> tuple[bool,
     """
     检查章节前置条件
     
-    Args:
+    参数：
         db: 数据库会话
         chapter: 当前章节
         
-    Returns:
+    返回：
         (可否生成, 错误信息, 前置章节列表)
     """
     # 如果是第一章，无需检查前置
@@ -364,13 +369,13 @@ async def build_smart_chapter_context(
     3. 近期概要：最近30章的简要摘要（200字/章）
     4. 最近完整：最近3章的完整内容
     
-    Args:
+    参数：
         db: 数据库会话
         project_id: 项目ID
         current_chapter_number: 当前章节序号
         user_id: 用户ID
         
-    Returns:
+    返回：
         包含各部分上下文的字典
     """
     context_parts = {
@@ -596,7 +601,7 @@ async def analyze_chapter_background(
     """
     后台异步分析章节（支持并发，使用锁保护数据库写入）
     
-    Args:
+    参数：
         chapter_id: 章节ID
         user_id: 用户ID
         project_id: 项目ID
@@ -899,6 +904,18 @@ async def generate_chapter_content_stream(
     style_id = generate_request.style_id
     target_word_count = generate_request.target_word_count or 3000
     enable_mcp = generate_request.enable_mcp if hasattr(generate_request, 'enable_mcp') else True
+    one_time_prompt = generate_request.one_time_prompt
+    log_chapter_generation_step(
+        logger,
+        chapter_id=chapter_id,
+        step=1,
+        message="解析生成参数",
+        style_id=style_id or "未指定",
+        target_word_count=target_word_count,
+        enable_mcp=enable_mcp,
+        one_time_prompt_chars=len((one_time_prompt or "").strip()),
+    )
+
     # 预先验证章节存在性（使用临时会话）
     async for temp_db in get_db(request):
         try:
@@ -924,6 +941,14 @@ async def generate_chapter_content_stream(
                 }
                 for ch in previous_chapters
             ]
+            log_chapter_generation_step(
+                logger,
+                chapter_id=chapter_id,
+                step=2,
+                message="章节与前置条件校验通过",
+                chapter_number=chapter.chapter_number,
+                previous_chapters=len(previous_chapters_data),
+            )
         finally:
             await temp_db.close()
         break
@@ -934,6 +959,13 @@ async def generate_chapter_content_stream(
         db_committed = False
         # 获取当前用户ID（在生成器外部就需要）
         current_user_id = getattr(request.state, "user_id", "system")
+        log_chapter_generation_step(
+            logger,
+            chapter_id=chapter_id,
+            step=3,
+            message="加载章节、项目、大纲、角色和写作风格",
+            user_id=current_user_id,
+        )
         
         try:
             # 创建新的数据库会话
@@ -1008,8 +1040,24 @@ async def generate_chapter_content_stream(
                         logger.warning(f"未找到风格 {style_id}")
                 else:
                     logger.info("未指定写作风格，使用原始提示词")
+
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=3,
+                    message="基础资料加载完成",
+                    outlines=len(all_outlines),
+                    characters=len(characters),
+                    style_chars=len(style_content),
+                )
                 
                 # 🚀 使用智能上下文构建（支持海量章节）
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=4,
+                    message="构建前置章节智能上下文",
+                )
                 smart_context = await build_smart_chapter_context(
                     db=db_session,
                     project_id=project.id,
@@ -1037,9 +1085,21 @@ async def generate_chapter_content_stream(
                 logger.info(f"  - 近期章节概要: {stats.get('recent_summaries', 0)}章")
                 logger.info(f"  - 最近完整内容: {stats.get('recent_full', 0)}章")
                 logger.info(f"  - 上下文总长度: {stats.get('total_length', 0)}字符")
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=4,
+                    message="前置章节智能上下文构建完成",
+                    context_chars=stats.get('total_length', 0),
+                )
                 
                 # 🧠 构建记忆增强上下文
-                logger.info(f"🧠 开始构建记忆增强上下文...")
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=5,
+                    message="构建长期记忆增强上下文",
+                )
                 memory_context = await memory_service.build_context_for_generation(
                     user_id=current_user_id,
                     project_id=project.id,
@@ -1068,12 +1128,26 @@ async def generate_chapter_content_stream(
                 logger.info(f"  - 记忆总长度: {total_memory_length} 字符")
                 logger.info(f"  - 前置章节上下文长度: {len(previous_content)} 字符")
                 logger.info(f"  - 总上下文长度(估算): {total_memory_length + len(previous_content) + 2000} 字符")
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=5,
+                    message="长期记忆增强上下文构建完成",
+                    memory_chars=total_memory_length,
+                )
             
                 # 发送开始事件
                 yield f"data: {json.dumps({'type': 'start', 'message': '开始AI创作...'}, ensure_ascii=False)}\n\n"
                 
                 # 🔧 MCP工具增强：收集章节参考资料
                 mcp_reference_materials = ""
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=6,
+                    message="执行 MCP 工具规划与资料收集",
+                    enable_mcp=enable_mcp,
+                )
                 if enable_mcp and current_user_id:
                     try:
                         yield f"data: {json.dumps({'type': 'progress', 'message': '🔍 尝试使用MCP工具收集参考资料...', 'progress': 28}, ensure_ascii=False)}\n\n"
@@ -1097,6 +1171,8 @@ async def generate_chapter_content_stream(
 2. 地理环境和场景描写参考
 3. 相关领域的专业知识（如武术、科技、魔法等）
 4. 文化习俗和生活细节
+5. 根据章节标签查询示例文章
+6. 根据写作风格查询示例写作风格的文章
 
 请根据章节内容，有针对性地查询1-2个最关键的问题。"""
                         
@@ -1113,24 +1189,76 @@ async def generate_chapter_content_stream(
                         )
                         
                         # 提取参考资料
-                        if planning_result.get("tool_calls_made", 0) > 0:
-                            tool_count = planning_result["tool_calls_made"]
+                        tool_count = planning_result.get("tool_calls_made", 0)
+                        if tool_count > 0:
                             yield f"data: {json.dumps({'type': 'progress', 'message': f'✅ MCP工具调用成功（{tool_count}次）', 'progress': 32}, ensure_ascii=False)}\n\n"
                             mcp_reference_materials = planning_result.get("content", "")
                             logger.info(f"📚 MCP工具收集参考资料：{len(mcp_reference_materials)} 字符")
                         else:
                             yield f"data: {json.dumps({'type': 'progress', 'message': 'ℹ️ 未使用MCP工具（无可用工具或不需要）', 'progress': 32}, ensure_ascii=False)}\n\n"
+
+                        log_chapter_generation_step(
+                            logger,
+                            chapter_id=chapter_id,
+                            step=6,
+                            message="MCP 工具规划与资料收集完成",
+                            tool_calls=tool_count,
+                            reference_chars=len(mcp_reference_materials),
+                        )
                             
                     except Exception as e:
                         logger.warning(f"MCP工具调用失败（降级处理）: {e}")
+                        log_chapter_generation_step(
+                            logger,
+                            chapter_id=chapter_id,
+                            step=6,
+                            message="MCP 工具调用失败，已降级为基础模式",
+                            error_type=type(e).__name__,
+                        )
                         yield f"data: {json.dumps({'type': 'progress', 'message': '⚠️ MCP工具暂时不可用，使用基础模式', 'progress': 32}, ensure_ascii=False)}\n\n"
+                else:
+                    log_chapter_generation_step(
+                        logger,
+                        chapter_id=chapter_id,
+                        step=6,
+                        message="跳过 MCP 工具规划",
+                        reason="未启用 MCP 或缺少用户标识",
+                    )
                 
                 # 根据是否有前置内容选择不同的提示词，并应用写作风格、记忆增强和MCP参考资料
                 chapter_outline_text = outline.content if outline else current_chapter.summary or '暂无大纲'
-                corpus_context = await CorpusBridge(current_user_id, db_session).get_reference_for_chapter(
-                    chapter_outline=chapter_outline_text,
-                    genre=project.genre or '',
-                    limit=5,
+                corpus_context = ""
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=7,
+                    message="调用语料库 MCP 获取范文与风格参考",
+                    enable_mcp=enable_mcp,
+                )
+                if enable_mcp and current_user_id:
+                    corpus_context = await CorpusBridge(
+                        current_user_id,
+                        db_session,
+                    ).get_reference_for_chapter(
+                        chapter_outline=chapter_outline_text,
+                        genre=project.genre or '',
+                        limit=5,
+                    )
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=7,
+                    message="语料库 MCP 参考准备完成",
+                    corpus_context_chars=len(corpus_context),
+                    status="完成" if enable_mcp and current_user_id else "跳过",
+                )
+
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=8,
+                    message="组装章节最终 Prompt",
+                    has_previous_content=bool(previous_content),
                 )
                 if previous_content:
                     prompt = prompt_service.get_chapter_generation_with_context_prompt(
@@ -1175,20 +1303,61 @@ async def generate_chapter_content_stream(
                         mcp_references=mcp_reference_materials,
                         corpus_context=corpus_context
                     )
+
+                prompt = append_one_time_prompt(prompt, one_time_prompt)
                 
                 if mcp_reference_materials:
                     logger.info(f"📖 已整合MCP参考资料（{len(mcp_reference_materials)}字符）到章节生成提示词")
+
+                log_final_chapter_prompt(
+                    logger,
+                    mode="单章流式生成",
+                    chapter_id=chapter_id,
+                    chapter_number=current_chapter.chapter_number,
+                    chapter_title=current_chapter.title,
+                    prompt=prompt,
+                )
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=8,
+                    message="章节最终 Prompt 组装完成并已打印",
+                    prompt_chars=len(prompt),
+                )
                 
-                logger.info(f"开始AI流式创作章节 {chapter_id}")
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=9,
+                    message="调用 AI 流式生成章节正文",
+                    provider=getattr(user_ai_service, "api_provider", "未知"),
+                    model=getattr(user_ai_service, "default_model", "未知"),
+                )
                 
                 # 流式生成内容
                 full_content = ""
+                chunk_count = 0
                 async for chunk in user_ai_service.generate_text_stream(prompt=prompt):
+                    chunk_count += 1
                     full_content += chunk
                     yield f"data: {json.dumps({'type': 'content', 'content': chunk}, ensure_ascii=False)}\n\n"
                     await asyncio.sleep(0)  # 让出控制权
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=9,
+                    message="AI 流式正文生成完成",
+                    chunks=chunk_count,
+                    generated_chars=len(full_content),
+                )
                 
                 # 更新章节内容到数据库
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=10,
+                    message="保存章节并创建后台分析任务",
+                )
                 old_word_count = current_chapter.word_count or 0
                 current_chapter.content = full_content
                 new_word_count = len(full_content)
@@ -1240,6 +1409,14 @@ async def generate_chapter_content_stream(
                     project_id=project.id,
                     task_id=task_id,
                     ai_service=user_ai_service
+                )
+                log_chapter_generation_step(
+                    logger,
+                    chapter_id=chapter_id,
+                    step=10,
+                    message="章节保存完成，后台分析任务已启动",
+                    word_count=new_word_count,
+                    analysis_task_id=task_id,
                 )
                 
                 # 发送完成事件（包含分析任务ID）
@@ -2278,6 +2455,15 @@ async def generate_single_chapter_for_batch(
             memory_context=memory_context,
             corpus_context=corpus_context
         )
+
+    log_final_chapter_prompt(
+        logger,
+        mode="批量生成",
+        chapter_id=chapter.id,
+        chapter_number=chapter.chapter_number,
+        chapter_title=chapter.title,
+        prompt=prompt,
+    )
     
     # 非流式生成内容
     full_content = ""

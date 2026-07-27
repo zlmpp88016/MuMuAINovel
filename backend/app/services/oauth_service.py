@@ -46,10 +46,10 @@ class LinuxDOOAuthService:
         """
         获取授权 URL
         
-        Args:
+        参数：
             state: 随机 state 参数
             
-        Returns:
+        返回：
             授权 URL
         """
         params = {
@@ -67,10 +67,10 @@ class LinuxDOOAuthService:
         """
         使用授权码获取访问令牌
         
-        Args:
+        参数：
             code: 授权码
             
-        Returns:
+        返回：
             包含 access_token 的字典,失败返回 None
         """
         data = {
@@ -103,10 +103,10 @@ class LinuxDOOAuthService:
         """
         使用访问令牌获取用户信息
         
-        Args:
+        参数：
             access_token: 访问令牌
             
-        Returns:
+        返回：
             用户信息字典,失败返回 None
         """
         try:

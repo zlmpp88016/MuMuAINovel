@@ -23,6 +23,9 @@ class BookListItem(BaseModel):
     progress: int
     created_at: datetime
     updated_at: datetime
+    error_message: str | None = None
+    completed_chunks: int | None = None
+    total_chunks: int | None = None
 
 
 class BookDetail(BookListItem):
@@ -37,7 +40,7 @@ class BookDetail(BookListItem):
 class SearchRequest(BaseModel):
     """书内搜索请求体。
 
-    Args:
+    参数：
         query: 用户输入的搜索文本，不能为空。
         limit: 最大返回条数，限制在 1 到 20 之间。
     """

@@ -59,3 +59,10 @@ def test_from_env_keeps_existing_system_env_over_dotenv(
     settings = Settings.from_env()
 
     assert settings.vector_backend == "simple"
+
+
+def test_mcp_defaults_to_localhost(tmp_path: Path) -> None:
+    settings = Settings(project_root=tmp_path)
+
+    assert settings.mcp_host == "127.0.0.1"
+    assert settings.mcp_port == 8765

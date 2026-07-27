@@ -42,27 +42,27 @@ class VectorStore(Protocol):
     def has_book(self, book_id: str) -> bool:
         """判断一本书是否已经建立索引。
 
-        Args:
+        参数：
             book_id: 书籍 UUID。
 
-        Returns:
+        返回：
             已存在至少一条索引文档时返回 ``True``。
         """
 
     def get_book_doc_ids(self, book_id: str) -> set[str]:
         """获取一本书现有的文档 ID 集合。
 
-        Args:
+        参数：
             book_id: 书籍 UUID。
 
-        Returns:
+        返回：
             该书已有的文档 ID 集合。
         """
 
     async def add_documents(self, book_id: str, documents: list[dict[str, Any]]) -> None:
         """写入一本书的所有索引文档。
 
-        Args:
+        参数：
             book_id: 书籍 UUID。
             documents: 文档列表，每项包含 ``id``、``text`` 和 ``metadata``。
         """
@@ -70,7 +70,7 @@ class VectorStore(Protocol):
     async def upsert_documents(self, book_id: str, documents: list[dict[str, Any]]) -> None:
         """增量写入或更新一本书的索引文档。
 
-        Args:
+        参数：
             book_id: 书籍 UUID。
             documents: 文档列表，每项包含 ``id``、``text`` 和 ``metadata``。
         """
@@ -78,12 +78,12 @@ class VectorStore(Protocol):
     async def search(self, book_id: str, query: str, limit: int = 5) -> list[dict[str, Any]]:
         """在一本书内检索相关片段。
 
-        Args:
+        参数：
             book_id: 书籍 UUID。
             query: 查询文本。
             limit: 最大返回数量。
 
-        Returns:
+        返回：
             统一格式的命中列表，包含 id、text、metadata 和 score。
         """
 
@@ -98,7 +98,7 @@ class VectorStore(Protocol):
     def delete_book(self, book_id: str) -> None:
         """删除一本书的所有索引文档。
 
-        Args:
+        参数：
             book_id: 书籍 UUID。
         """
 
@@ -197,7 +197,8 @@ class SimpleVectorStore:
 
         hits: list[dict[str, Any]] = []
         for document in self._documents.values():
-            if not _metadata_matches(document.metadata, filters):
+            metadata = {**document.metadata, "book_id": document.book_id}
+            if not _metadata_matches(metadata, filters):
                 continue
             score = _cosine_similarity(query_counts, document.token_counts)
             if score <= 0:
@@ -206,7 +207,7 @@ class SimpleVectorStore:
                 {
                     "id": document.id,
                     "text": document.text,
-                    "metadata": {**document.metadata, "book_id": document.book_id},
+                    "metadata": metadata,
                     "score": round(score, 6),
                 }
             )
@@ -234,10 +235,10 @@ class ChromaVectorStore:
     def __init__(self, settings: Settings) -> None:
         """初始化 Chroma client、collection 和 embedding 后端。
 
-        Args:
+        参数：
             settings: 向量库路径、collection 名称和 embedding 配置。
 
-        Raises:
+        抛出：
             RuntimeError: ChromaDB 或本地 embedding 依赖缺失。
             ValueError: API embedding 配置不完整。
         """
@@ -282,7 +283,7 @@ class ChromaVectorStore:
     async def add_documents(self, book_id: str, documents: list[dict[str, Any]]) -> None:
         """为一本书生成 embedding 并写入 Chroma。
 
-        Args:
+        参数：
             book_id: 书籍 UUID。
             documents: 待索引文档，metadata 会被规范化为 Chroma 支持的基础类型。
         """
@@ -348,12 +349,12 @@ class ChromaVectorStore:
     async def search(self, book_id: str, query: str, limit: int = 5) -> list[dict[str, Any]]:
         """在 Chroma 中按语义相似度检索一本书的片段。
 
-        Args:
+        参数：
             book_id: 书籍 UUID，用作 metadata 过滤条件。
             query: 查询文本。
             limit: 最大返回数量。
 
-        Returns:
+        返回：
             已反序列化 tags、tag_metadata 和 character_names 的命中列表。
         """
         query_embedding = await self._embed(query)
@@ -398,9 +399,12 @@ class ChromaVectorStore:
         """在整个 Chroma collection 中按语义相似度检索片段。"""
         query_embedding = await self._embed(query)
         where_filter = _build_chroma_where(filters)
+        # tags 以 JSON 字符串保存在 Chroma metadata 中，无法可靠地在 where
+        # 中做集合相交。先扩大候选集，再用统一过滤器做严格后过滤。
+        candidate_limit = limit * 4 if filters and filters.get("tags") else limit
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=limit,
+            n_results=candidate_limit,
             where=where_filter,
         )
 
@@ -411,6 +415,8 @@ class ChromaVectorStore:
                 metadata["tags"] = _loads_json_list(metadata.get("tags"))
                 metadata["tag_metadata"] = _loads_json_dict(metadata.get("tag_metadata"))
                 metadata["character_names"] = _loads_json_list(metadata.get("character_names"))
+                if not _metadata_matches(metadata, filters):
+                    continue
                 hits.append(
                     {
                         "id": results["ids"][0][index],
@@ -422,7 +428,7 @@ class ChromaVectorStore:
                     }
                 )
         logger.info("[ChromaVectorStore] 语料搜索完成: query=\"%s\", 命中=%d", query, len(hits))
-        return hits
+        return hits[:limit]
 
     def delete_book(self, book_id: str) -> None:
         """按 ``book_id`` 删除 Chroma 中的全部文档。"""
@@ -481,10 +487,10 @@ class ChromaVectorStore:
     async def _call_embedding_api(self, texts: list[str]) -> list[list[float]]:
         """调用 OpenAI-compatible embedding API，带超时重试。
 
-        Args:
+        参数：
             texts: 单条或多条待编码文本。
 
-        Returns:
+        返回：
             与输入顺序一致的向量列表。
         """
         timeout = 60.0 if len(texts) > 1 else 30.0
@@ -513,7 +519,7 @@ class ChromaVectorStore:
                     items.sort(key=lambda item: item["index"])
                     return [item["embedding"] for item in items]
             except Exception as exc:
-                logger.error(f"Embedding API,{str(exc)}", exc_info=True)
+                logger.error("Embedding API 调用失败：%s", exc, exc_info=True)
                 last_exc = exc
                 if attempt < max_retries - 1:
                     logger.warning(
@@ -528,10 +534,10 @@ class ChromaVectorStore:
 def create_vector_store(settings: Settings) -> VectorStore:
     """按配置创建向量库实现，默认优先 Chroma。
 
-    Args:
+    参数：
         settings: 当前服务配置。
 
-    Returns:
+    返回：
         ``ChromaVectorStore`` 或 ``SimpleVectorStore``。
     """
     backend = (settings.vector_backend or "auto").lower()
@@ -588,6 +594,10 @@ def _metadata_matches(metadata: dict[str, Any], filters: dict[str, Any] | None) 
             wanted = value if isinstance(value, list) else [value]
             if not set(wanted) & set(tags):
                 return False
+        if key == "book_ids":
+            wanted = value if isinstance(value, list) else [value]
+            if metadata.get("book_id") not in set(wanted):
+                return False
     return True
 
 
@@ -600,6 +610,13 @@ def _build_chroma_where(filters: dict[str, Any] | None) -> dict[str, Any] | None
         value = filters.get(key)
         if value:
             conditions.append({key: str(value)})
+    book_ids = filters.get("book_ids")
+    if book_ids:
+        values = book_ids if isinstance(book_ids, list) else [book_ids]
+        if len(values) == 1:
+            conditions.append({"book_id": str(values[0])})
+        else:
+            conditions.append({"book_id": {"$in": [str(value) for value in values]}})
     if not conditions:
         return None
     if len(conditions) == 1:

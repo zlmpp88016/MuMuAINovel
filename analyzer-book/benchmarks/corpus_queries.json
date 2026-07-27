@@ -1,0 +1,26 @@
+{
+  "minimum_corpus_books": 50,
+  "queries": [
+    {
+      "id": "suspense-rain-investigation",
+      "query": "雨夜追查秘密，线索逐步暴露",
+      "expected_tags": ["伏笔", "冲突"],
+      "relevant_book_ids": [],
+      "limit": 5
+    },
+    {
+      "id": "dialogue-confrontation",
+      "query": "双方通过对话试探，信息差推动冲突升级",
+      "expected_tags": ["冲突"],
+      "relevant_book_ids": [],
+      "limit": 5
+    },
+    {
+      "id": "emotional-turning-point",
+      "query": "角色在关键选择中暴露缺陷并完成情绪转折",
+      "expected_tags": ["成长"],
+      "relevant_book_ids": [],
+      "limit": 5
+    }
+  ]
+}

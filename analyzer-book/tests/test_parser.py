@@ -13,7 +13,8 @@ from book_analyzer.parser import chunk_chapters, decode_text_file, parse_book_te
 
 def test_decode_text_file_supports_utf8_sig() -> None:
     raw = "书名\n第1章 开端\n张三来到京城。".encode("utf-8-sig")
-    decoded = decode_text_file(raw)
+    decoded, enc = decode_text_file(raw)
+    assert enc.lower() in ("utf-8-sig", "utf-8")
     assert "张三来到京城" in decoded
 
 

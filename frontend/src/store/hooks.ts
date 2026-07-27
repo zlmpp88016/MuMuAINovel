@@ -7,6 +7,7 @@ import { useCallback } from 'react';
 import { message } from 'antd';
 import { useStore } from './index';
 import { projectApi, outlineApi, characterApi, chapterApi } from '../services/api';
+import { buildChapterGenerateRequest } from '../services/chapter-generation';
 import type {
   PaginationResponse,
   Outline,
@@ -304,7 +305,8 @@ export function useChapterSync() {
     onProgress?: (content: string) => void,
     styleId?: number,
     targetWordCount?: number,
-    onProgressUpdate?: (message: string, progress: number) => void
+    onProgressUpdate?: (message: string, progress: number) => void,
+    oneTimePrompt?: string
   ) => {
     try {
       // 使用fetch处理流式响应
@@ -313,10 +315,11 @@ export function useChapterSync() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          style_id: styleId,
-          target_word_count: targetWordCount
-        }),
+        body: JSON.stringify(buildChapterGenerateRequest({
+          styleId,
+          targetWordCount,
+          oneTimePrompt,
+        })),
       });
 
       if (!response.ok) {

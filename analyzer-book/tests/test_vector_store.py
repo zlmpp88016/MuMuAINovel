@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from book_analyzer.vector_store import SimpleVectorStore
+from book_analyzer.vector_store import SimpleVectorStore, _build_chroma_where
 
 
 def test_vector_store_search_and_delete() -> None:
@@ -79,3 +79,34 @@ def test_vector_store_search_corpus_with_filters() -> None:
     assert asyncio.run(
         store.search_corpus("京城秘密", limit=5, filters={"scene_type": "日常"})
     ) == []
+    assert asyncio.run(
+        store.search_corpus("京城秘密", limit=5, filters={"tags": ["伏笔"]})
+    )
+    assert asyncio.run(
+        store.search_corpus("京城秘密", limit=5, filters={"tags": ["成长"]})
+    ) == []
+    assert asyncio.run(
+        store.search_corpus("京城秘密", limit=5, filters={"book_ids": ["book-1"]})
+    )
+    assert asyncio.run(
+        store.search_corpus("京城秘密", limit=5, filters={"book_ids": ["book-2"]})
+    ) == []
+
+
+def test_build_chroma_where_uses_scalar_filters_and_book_ids() -> None:
+    where = _build_chroma_where(
+        {
+            "scene_type": "悬疑",
+            "mood": "紧张",
+            "book_ids": ["book-1", "book-2"],
+            "tags": ["伏笔"],
+        }
+    )
+
+    assert where == {
+        "$and": [
+            {"scene_type": "悬疑"},
+            {"mood": "紧张"},
+            {"book_id": {"$in": ["book-1", "book-2"]}},
+        ]
+    }

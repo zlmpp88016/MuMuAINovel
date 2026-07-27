@@ -238,6 +238,7 @@ export interface ChapterUpdate {
 export interface ChapterGenerateRequest {
   style_id?: number;
   target_word_count?: number;
+  one_time_prompt?: string;
 }
 
 // 章节生成检查响应

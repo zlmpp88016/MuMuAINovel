@@ -30,7 +30,7 @@ class HTTPMCPClient:
         """
         初始化HTTP MCP客户端
         
-        Args:
+        参数：
             url: MCP服务器URL
             headers: HTTP请求头
             env: 环境变量（用于API Key等）
@@ -103,7 +103,7 @@ class HTTPMCPClient:
         """
         初始化MCP会话
         
-        Returns:
+        返回：
             初始化响应
         """
         await self._ensure_connected()
@@ -113,7 +113,7 @@ class HTTPMCPClient:
         """
         列举可用工具
         
-        Returns:
+        返回：
             工具列表
         """
         try:
@@ -146,20 +146,41 @@ class HTTPMCPClient:
         """
         调用工具
         
-        Args:
+        参数：
             tool_name: 工具名称
             arguments: 工具参数
             
-        Returns:
+        返回：
             工具执行结果
         """
+        started_at = asyncio.get_running_loop().time()
         try:
             await self._ensure_connected()
             
-            logger.info(f"调用工具: {tool_name}")
-            logger.debug(f"参数: {arguments}")
+            logger.info(
+                "🔧 [MCP调用][HTTP请求] 开始 | 工具=%s | 参数字段=%s | 超时=%ss",
+                tool_name,
+                sorted(arguments),
+                self.timeout,
+            )
             
             result = await self._session.call_tool(tool_name, arguments)
+
+            # 新版 MCP 结果可能同时包含结构化数据和文本回退。优先保留结构化
+            # 内容，避免上层再次解析 JSON 文本或丢失返回字段。
+            structured_content = getattr(result, 'structuredContent', None)
+            if structured_content is None:
+                structured_content = getattr(result, 'structured_content', None)
+            logger.info(
+                "✅ [MCP调用][HTTP响应] 收到结果 | 工具=%s | 耗时=%.2fms | "
+                "结构化结果=%s | 内容块=%d",
+                tool_name,
+                (asyncio.get_running_loop().time() - started_at) * 1000,
+                structured_content is not None,
+                len(getattr(result, 'content', None) or []),
+            )
+            if structured_content:
+                return structured_content
             
             # 处理返回结果
             # MCP SDK 返回 CallToolResult 对象
@@ -177,21 +198,24 @@ class HTTPMCPClient:
                 # 如果没有文本内容，返回原始内容
                 return result.content[0] if result.content else None
             
-            # 如果有结构化内容（2025-06-18规范）
-            if hasattr(result, 'structuredContent') and result.structuredContent:
-                return result.structuredContent
-            
             return None
             
         except Exception as e:
-            logger.error(f"调用工具失败: {tool_name}, 错误: {e}")
+            logger.error(
+                "❌ [MCP调用][HTTP请求] 失败 | 工具=%s | 耗时=%.2fms | "
+                "错误类型=%s | 错误=%s",
+                tool_name,
+                (asyncio.get_running_loop().time() - started_at) * 1000,
+                type(e).__name__,
+                e,
+            )
             raise MCPError(f"调用工具失败: {str(e)}")
     
     async def list_resources(self) -> List[Dict[str, Any]]:
         """
         列举可用资源
         
-        Returns:
+        返回：
             资源列表
         """
         try:
@@ -221,10 +245,10 @@ class HTTPMCPClient:
         """
         读取资源
         
-        Args:
+        参数：
             uri: 资源URI
             
-        Returns:
+        返回：
             资源内容
         """
         try:
@@ -260,7 +284,7 @@ class HTTPMCPClient:
         """
         测试连接
         
-        Returns:
+        返回：
             测试结果
         """
         import time
@@ -329,13 +353,13 @@ async def create_mcp_client(
     """
     创建MCP客户端的上下文管理器
     
-    Args:
+    参数：
         url: MCP服务器URL
         headers: HTTP请求头
         env: 环境变量
         timeout: 超时时间
         
-    Yields:
+    生成：
         HTTPMCPClient实例
     """
     client = HTTPMCPClient(url, headers, env, timeout)

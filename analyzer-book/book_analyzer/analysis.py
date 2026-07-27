@@ -48,7 +48,7 @@ SENTENCE_SPLIT_RE = re.compile(r"(?<=[。！？!?])")
 class ChunkAnalysis:
     """单个文本片段的结构化分析结果。
 
-    Args:
+    参数：
         chapter_no: 片段所属章节序号。
         chapter_title: 片段所属章节标题。
         chunk_index: 片段在章节内的序号。
@@ -79,10 +79,10 @@ class Analyzer(Protocol):
     async def analyze_chunk(self, chunk: Chunk) -> ChunkAnalysis:
         """分析单个文本片段。
 
-        Args:
+        参数：
             chunk: 由 parser 切出的章节片段。
 
-        Returns:
+        返回：
             可持久化、可索引的片段分析结果。
         """
 
@@ -94,12 +94,12 @@ class Analyzer(Protocol):
     ) -> dict[str, Any]:
         """汇总整本书分析。
 
-        Args:
+        参数：
             title: 书名。
             chapters: 解析后的章节列表。
             analyses: 所有 chunk 的分析结果。
 
-        Returns:
+        返回：
             JSON-serializable 的整书分析摘要。
         """
 
@@ -114,7 +114,7 @@ class RuleBasedAnalyzer(Analyzer):
     def __init__(self, tagger: ParagraphTagger | None = None) -> None:
         """初始化规则分析器。
 
-        Args:
+        参数：
             tagger: 可选段落打标签器；为空时使用内置规则打标。
         """
         self.tagger = tagger
@@ -138,13 +138,13 @@ class RuleBasedAnalyzer(Analyzer):
     ) -> ChunkAnalysis:
         """组装片段分析结果。
 
-        Args:
+        参数：
             chunk: 待分析的文本片段。
             tagging: 已解析出的标签结果；为空时使用规则标签。
             summary: 可选摘要；为空时用规则摘要。
             importance: 可选重要性分数；为空时按规则估算。
 
-        Returns:
+        返回：
             标准化后的 ``ChunkAnalysis``。
         """
         tagging = tagging or self._rule_tagging(chunk.content)
@@ -196,12 +196,12 @@ class RuleBasedAnalyzer(Analyzer):
     ) -> dict[str, Any]:
         """根据所有 chunk 分析结果生成整书摘要。
 
-        Args:
+        参数：
             title: 书名。
             chapters: 原始章节列表。
             analyses: 已完成的 chunk 分析结果。
 
-        Returns:
+        返回：
             包含书籍画像、章节大纲、角色卡和情节线索的字典。
         """
         full_text = "\n".join(chunk.content for chunk in analyses)
@@ -364,8 +364,8 @@ class RuleBasedAnalyzer(Analyzer):
 class LLMAnalyzer(Analyzer):
     """LLM 分析器。
 
-    主 LLM 只负责摘要、重要性和整书汇总；段落标签仍由 fallback 中挂载的
-    dedicated tagger 负责。默认情况下模型调用异常会回退到规则分析。
+    主 LLM 只负责摘要、重要性和整书汇总；段落标签仍由兜底分析器中挂载的
+    专用 tagger 负责。默认情况下模型调用异常会回退到规则分析。
     """
 
     def __init__(
@@ -376,9 +376,9 @@ class LLMAnalyzer(Analyzer):
     ) -> None:
         """初始化 LLM 分析器。
 
-        Args:
+        参数：
             ai_service: 主分析模型客户端。
-            fallback: 规则兜底分析器，内部也承载 dedicated tagger。
+            fallback: 规则兜底分析器，内部也承载专用 tagger。
             allow_rule_fallback: LLM 调用失败时是否允许回退规则分析。
         """
         self.ai_service = ai_service
@@ -397,7 +397,7 @@ class LLMAnalyzer(Analyzer):
             logger.info("[LLM分析] chunk %d-%d 调用主模型 ...", chunk.chapter_no, chunk.chunk_index)
             response = await self.ai_service.generate_text(
                 prompt=prompt,
-                system_prompt="你是一个严谨的中文小说分析助手，只返回 JSON。",
+                system_prompt="你是一个严谨的中文小说分析助手，只返回 JSON。如果有思考过程则思考结束后，于正文区输出最终的 JSON 结果，不要将最终的 JSON 写入思考区",
             )
             payload = self._parse_json_response(response["content"])
             if not tagging.characters:
@@ -444,7 +444,7 @@ class LLMAnalyzer(Analyzer):
             logger.info("[LLM汇总] 调用主模型生成整书摘要: 书名=%s", title)
             response = await self.ai_service.generate_text(
                 prompt=prompt,
-                system_prompt="你是一个严谨的中文小说分析助手，只返回 JSON。",
+                system_prompt="你是一个严谨的中文小说分析助手，只返回 JSON。如果有思考过程则思考结束后，于正文区输出最终的 JSON 结果，不要将最终的 JSON 写入思考区",
                 max_tokens=2500,
             )
             payload = self._parse_json_response(response["content"])
@@ -535,12 +535,14 @@ class LLMAnalyzer(Analyzer):
             payload = json.loads(cleaned)
             if isinstance(payload, dict):
                 return payload
-        except json.JSONDecodeError:
+        except json.JSONDecodeError or json.decoder.JSONDecodeError:
             json_match = re.search(r"\{[\s\S]*\}", response)
             if json_match:
                 payload = json.loads(json_match.group())
                 if isinstance(payload, dict):
                     return payload
+            else:
+                logger.error(f"LLM 返回内容不是有效JSON:{response}")
         raise ValueError("LLM 返回内容不是有效 JSON")
 
     def _as_str_list(self, value: Any) -> list[str]:
@@ -564,15 +566,15 @@ def create_analyzer(
 ) -> Analyzer:
     """根据配置和模型可用性创建分析器。
 
-    Args:
+    参数：
         settings: 当前服务配置。
         ai_service: 主分析模型客户端。
         tagging_ai_service: 可选 tagging 专用小模型客户端。
 
-    Returns:
+    返回：
         ``LLMAnalyzer`` 或 ``RuleBasedAnalyzer``。
 
-    Raises:
+    抛出：
         RuntimeError: 强制使用 LLM 分析但主模型不可用。
     """
     tag_rule_fallback = RuleBasedAnalyzer()

@@ -17,10 +17,10 @@ from sqlalchemy.orm import sessionmaker, Session
 def create_sqlalchemy_engine(database_url: str) -> Engine:
     """创建 SQLAlchemy engine。
 
-    Args:
+    参数：
         database_url: SQLAlchemy 数据库 URL，例如 ``sqlite:///...``。
 
-    Returns:
+    返回：
         已配置好的同步 SQLAlchemy engine。
     """
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
@@ -37,10 +37,10 @@ def create_sqlalchemy_engine(database_url: str) -> Engine:
 def create_session_factory(engine: Engine) -> sessionmaker[Session]:
     """基于 engine 创建同步 Session 工厂。
 
-    Args:
+    参数：
         engine: ``create_sqlalchemy_engine`` 返回的 engine。
 
-    Returns:
+    返回：
         配置了 ``expire_on_commit=False`` 的 sessionmaker。
     """
     return sessionmaker(bind=engine, expire_on_commit=False, class_=Session)
@@ -49,10 +49,10 @@ def create_session_factory(engine: Engine) -> sessionmaker[Session]:
 def ensure_schema_compatibility(engine: Engine) -> None:
     """执行轻量向前兼容迁移。
 
-    Args:
+    参数：
         engine: 已初始化的 SQLAlchemy engine。
 
-    Notes:
+    说明：
         V1 没有引入 Alembic。这里仅处理早期本地库缺少新增列的场景，
         不承载复杂 schema 演进。
     """
@@ -84,10 +84,10 @@ def ensure_schema_compatibility(engine: Engine) -> None:
 def session_scope(session_factory: sessionmaker[Session]) -> Iterator[Session]:
     """提供一个事务性 session 上下文。
 
-    Args:
+    参数：
         session_factory: 同步 SQLAlchemy sessionmaker。
 
-    Yields:
+    生成：
         一个会在成功时提交、异常时回滚的 ``Session``。
     """
     session = session_factory()

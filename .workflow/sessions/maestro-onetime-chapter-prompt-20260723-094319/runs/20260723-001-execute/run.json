@@ -1,0 +1,86 @@
+{
+  "schema_version": "command-run/1.3",
+  "session_id": "maestro-onetime-chapter-prompt-20260723-094319",
+  "run_id": "20260723-001-execute",
+  "sequence": 1,
+  "parent_run_id": null,
+  "chain_step_id": "step-000-execute",
+  "resolved_platform": "claude",
+  "goal_binding": null,
+  "checkpoint_expectation": null,
+  "checkpoint": null,
+  "retry_fence": null,
+  "contract_snapshot": {
+    "schema_version": "contract-snapshot/1.0",
+    "contract_version": "command-contract/1.0",
+    "normalized": {
+      "contract_version": 1,
+      "consumes": [],
+      "produces": [],
+      "gates": {
+        "entry": [],
+        "exit": []
+      }
+    },
+    "snapshot_hash": "sha256:4cf0b2520cdb34a0443e432aa1bc6f49d4035208ca410588fd059e8ad245609e",
+    "parser_version": "maestro-command-contract/2",
+    "captured_at": "2026-07-23T09:44:36.109Z",
+    "warnings": []
+  },
+  "guidance_snapshot": {
+    "schema_version": "guidance-snapshot/1.0",
+    "source_path": "C:/Users/zhu/.claude/commands/maestro-execute.md",
+    "content_hash": "sha256:20d5c3539a374e32f6098f6ddd853b14d02eccf19b306a152e8d3da5733294bc",
+    "resolved_prompt_hash": "sha256:20d5c3539a374e32f6098f6ddd853b14d02eccf19b306a152e8d3da5733294bc",
+    "prepare_hash": null,
+    "workflow_hash": "sha256:7749720bc4b3a5f596558e9dc6dc4a56882b00774aa63e78c4a11507a7fd759e",
+    "run_mode_hash": "sha256:9aa92c7ea64b766e0724522988cccfffafecbed5c8cada506061f93541f5e7a1"
+  },
+  "creation_decision": {
+    "schema_version": "creation-decision/1.0",
+    "decision_id": "dec_fe8dcf074ca9491c07b748f9",
+    "request_id": null,
+    "mode": "chain-next",
+    "authority": "chain-transition",
+    "decided_at": "2026-07-23T17:44:36+08:00",
+    "session_identity_revision": 2,
+    "session_activity_revision": 0,
+    "confirmation_token_hash": null
+  },
+  "creation_provenance": {
+    "schema_version": "creation-provenance/1.0",
+    "provenance": "native-v2",
+    "source_workspace_id": null,
+    "source_session_id": null,
+    "source_run_id": null,
+    "imported_artifact_hashes": []
+  },
+  "transition": null,
+  "command": {
+    "name": "execute",
+    "version": "1.0",
+    "source_path": "C:/Users/zhu/.claude/commands/maestro-execute.md",
+    "content_hash": "20d5c3539a374e32f6098f6ddd853b14d02eccf19b306a152e8d3da5733294bc",
+    "resolved_prompt_hash": "20d5c3539a374e32f6098f6ddd853b14d02eccf19b306a152e8d3da5733294bc",
+    "contract_hash": "4cf0b2520cdb34a0443e432aa1bc6f49d4035208ca410588fd059e8ad245609e"
+  },
+  "status": "running",
+  "input": {
+    "args": [
+      "在 frontend/src/pages/Chapters.tsx 点击 AI 创作时弹出输入框，允许用户填写仅适用于本次生成的 Prompt；通过章节生成请求传递到后端并追加到最终 Prompt；保持空值兼容并补测试"
+    ],
+    "consumes": [],
+    "context_identity_revision": 2,
+    "reuse_assessments": []
+  },
+  "gate_ids": [],
+  "output": {
+    "produces": [],
+    "primary_artifact_id": null,
+    "verdict": null
+  },
+  "handoff": null,
+  "started_at": "2026-07-23T17:44:36+08:00",
+  "completed_at": null,
+  "sealed_at": null
+}

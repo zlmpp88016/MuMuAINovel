@@ -178,7 +178,7 @@ class PlotAnalyzer:
         """
         初始化剧情分析器
         
-        Args:
+        参数：
             ai_service: AI服务实例
         """
         self.ai_service = ai_service
@@ -194,13 +194,13 @@ class PlotAnalyzer:
         """
         分析单章内容
         
-        Args:
+        参数：
             chapter_number: 章节号
             title: 章节标题
             content: 章节内容
             word_count: 字数
         
-        Returns:
+        返回：
             分析结果字典,失败返回None
         """
         try:
@@ -261,10 +261,10 @@ class PlotAnalyzer:
         """
         解析AI返回的分析结果
         
-        Args:
+        参数：
             response: AI返回的文本
         
-        Returns:
+        返回：
             解析后的字典,失败返回None
         """
         try:
@@ -318,14 +318,14 @@ class PlotAnalyzer:
         """
         从分析结果中提取记忆片段
         
-        Args:
+        参数：
             analysis: 分析结果
             chapter_id: 章节ID
             chapter_number: 章节号
             chapter_content: 章节完整内容(用于计算位置)
             chapter_title: 章节标题
         
-        Returns:
+        返回：
             记忆片段列表
         """
         memories = []
@@ -494,11 +494,11 @@ class PlotAnalyzer:
         """
         在全文中查找关键词位置
         
-        Args:
+        参数：
             full_text: 完整文本
             keyword: 关键词
         
-        Returns:
+        返回：
             (起始位置, 长度) 如果未找到返回(-1, 0)
         """
         if not keyword or not full_text:
@@ -539,10 +539,10 @@ class PlotAnalyzer:
         """
         生成分析摘要文本
         
-        Args:
+        参数：
             analysis: 分析结果
         
-        Returns:
+        返回：
             格式化的摘要文本
         """
         try:

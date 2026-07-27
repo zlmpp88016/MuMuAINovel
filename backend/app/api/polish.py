@@ -57,6 +57,8 @@ async def polish_text(
             max_tokens=len(request.original_text) * 2  # 预留足够token
         )
         polished_text = result.get("content", "") if isinstance(result, dict) else str(result)
+        if not polished_text.strip():
+            raise ValueError("AI服务返回空响应")
         
         # 计算字数
         word_count_before = len(request.original_text)
@@ -68,10 +70,8 @@ async def polish_text(
         if request.project_id:
             history = GenerationHistory(
                 project_id=request.project_id,
-                generation_type="polish",
                 prompt=f"原文: {request.original_text[:100]}...",
-                result=polished_text,
-                provider=request.provider or "default",
+                generated_content=polished_text,
                 model=request.model or "default"
             )
             db.add(history)

@@ -300,7 +300,7 @@ export default function Chapters() {
     }
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (oneTimePrompt?: string) => {
     if (!editingId) return;
 
     try {
@@ -327,7 +327,8 @@ export default function Chapters() {
           // 进度回调
           setSingleChapterProgress(progressValue);
           setSingleChapterProgressMessage(progressMsg);
-        }
+        },
+        oneTimePrompt
       );
       
       message.success('AI创作成功，正在分析章节内容...');
@@ -366,6 +367,7 @@ export default function Chapters() {
     ).sort((a, b) => a.chapter_number - b.chapter_number);
 
     const selectedStyle = writingStyles.find(s => s.id === selectedStyleId);
+    let oneTimePrompt = '';
 
     const modal = Modal.confirm({
       title: 'AI创作章节内容',
@@ -384,6 +386,24 @@ export default function Chapters() {
             )}
             <li><strong>目标字数：{targetWordCount}字</strong></li>
           </ul>
+
+          <div style={{ marginTop: 16 }}>
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>
+              本次自定义 Prompt（可选）
+            </div>
+            <TextArea
+              autoSize={{ minRows: 3, maxRows: 8 }}
+              maxLength={10000}
+              showCount
+              placeholder="例如：本章增加悬疑氛围，结尾保留一个未揭晓的线索。留空则按原有方式生成。"
+              onChange={(event) => {
+                oneTimePrompt = event.target.value;
+              }}
+            />
+            <div style={{ marginTop: 6, color: '#666', fontSize: 12 }}>
+              该 Prompt 仅用于此次生成，关闭弹框后不会保存，也不会影响后续章节。
+            </div>
+          </div>
           
           {previousChapters.length > 0 && (
             <div style={{
@@ -438,7 +458,7 @@ export default function Chapters() {
             });
             return;
           }
-          await handleGenerate();
+          await handleGenerate(oneTimePrompt);
           modal.destroy();
         } catch (error) {
           modal.update({

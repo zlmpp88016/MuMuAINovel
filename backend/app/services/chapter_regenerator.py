@@ -6,6 +6,7 @@ from app.models.chapter import Chapter
 from app.models.memory import PlotAnalysis
 from app.schemas.regeneration import ChapterRegenerateRequest, PreserveElementsConfig
 from app.logger import get_logger
+from app.utils.chapter_generation_logging import log_final_chapter_prompt
 import difflib
 
 logger = get_logger(__name__)
@@ -28,13 +29,13 @@ class ChapterRegenerator:
         """
         根据反馈重新生成章节（流式）
         
-        Args:
+        参数：
             chapter: 原始章节对象
             analysis: 分析结果（可选）
             regenerate_request: 重新生成请求参数
             project_context: 项目上下文（项目信息、角色、大纲等）
         
-        Yields:
+        生成：
             包含类型和数据的字典: {'type': 'progress'/'chunk', 'data': ...}
         """
         try:
@@ -56,6 +57,14 @@ class ChapterRegenerator:
                 modification_instructions=modification_instructions,
                 project_context=project_context,
                 regenerate_request=regenerate_request
+            )
+            log_final_chapter_prompt(
+                logger,
+                mode="章节重新生成",
+                chapter_id=chapter.id,
+                chapter_number=chapter.chapter_number,
+                chapter_title=chapter.title,
+                prompt=full_prompt,
             )
             
             logger.info(f"🎯 提示词构建完成，开始AI生成")
@@ -272,7 +281,7 @@ class ChapterRegenerator:
         """
         计算两个版本的差异
         
-        Returns:
+        返回：
             差异统计信息
         """
         # 基本统计

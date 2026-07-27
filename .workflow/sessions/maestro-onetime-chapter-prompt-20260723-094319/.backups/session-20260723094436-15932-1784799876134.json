@@ -1,0 +1,89 @@
+{
+  "session_id": "maestro-onetime-chapter-prompt-20260723-094319",
+  "intent": "为章节 AI 创作增加仅本次生成使用的自定义 Prompt",
+  "status": "running",
+  "identity_revision": 1,
+  "activity_revision": 0,
+  "active_run_id": null,
+  "latest_completed_run_id": null,
+  "boundary_contract": {
+    "in_scope": [],
+    "out_of_scope": [],
+    "constraints": [],
+    "definition_of_done": ""
+  },
+  "orchestration": {
+    "engine": "ralph",
+    "quality_mode": "standard",
+    "auto_mode": false,
+    "chain": [
+      {
+        "step_id": "step-000-execute",
+        "command": "execute",
+        "status": "pending",
+        "run_id": null,
+        "inserted_by": "build",
+        "decision_ref": null,
+        "args": "在 frontend/src/pages/Chapters.tsx 点击 AI 创作时弹出输入框，允许用户填写仅适用于本次生成的 Prompt；通过章节生成请求传递到后端并追加到最终 Prompt；保持空值兼容并补测试",
+        "stage": "execute",
+        "goal_ref": "G1",
+        "retry": {
+          "count": 0,
+          "max": 2
+        }
+      }
+    ],
+    "decision_points": [],
+    "position": {
+      "lifecycle": "execution",
+      "phase": null,
+      "phase_is_new": false,
+      "milestone": "",
+      "planning_mode": "unified",
+      "passed_gates": [],
+      "scope_verdict": "narrow"
+    },
+    "decomposition": null,
+    "lease": null,
+    "executor": {
+      "platform": "agent",
+      "cli_tool": "codex"
+    }
+  },
+  "lifecycle": {
+    "sealed_at": null,
+    "seal_summary": null,
+    "promoted_spec_ids": [],
+    "promoted_knowhow_ids": [],
+    "forked_from": null
+  },
+  "refs": {
+    "gates": "gates.json",
+    "artifacts": "artifacts.json",
+    "evidence": "evidence.json"
+  },
+  "intent_identity": {
+    "schema_version": "intent-identity/1.0",
+    "normalization": "NFKC+unicode-lower+whitespace-collapse/1",
+    "workspace_id": "sha256:57b5275a2310dfc9d7030c9504260985df06b078eafa6bcc3f16d3590a434beb",
+    "command": "session",
+    "verbatim": "为章节 AI 创作增加仅本次生成使用的自定义 Prompt",
+    "normalized": "为章节 ai 创作增加仅本次生成使用的自定义 prompt",
+    "normalized_length": 29,
+    "normalized_hash": "sha256:82e3ddbc406cc1f2c66e3c3471cf21085a251ced67c8061aca6a785d37b78482",
+    "revision": 1,
+    "source": "persisted",
+    "backfill_status": "native",
+    "empty": false
+  },
+  "provenance": {
+    "source": "native",
+    "forked_from": null,
+    "imported_from": [],
+    "created_by": "session-store"
+  },
+  "requests": [],
+  "ralph_authority": null,
+  "schema_version": "session/1.3",
+  "topic_identity": null
+}

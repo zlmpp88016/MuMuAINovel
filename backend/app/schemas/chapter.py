@@ -67,6 +67,11 @@ class ChapterGenerateRequest(BaseModel):
         le=10000  # 最大10000字
     )
     enable_mcp: bool = Field(True, description="是否启用MCP工具增强（搜索参考资料）")
+    one_time_prompt: Optional[str] = Field(
+        None,
+        description="仅适用于本次章节生成的自定义要求",
+        max_length=10000,
+    )
 
 
 class BatchGenerateRequest(BaseModel):

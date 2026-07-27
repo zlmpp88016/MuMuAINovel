@@ -45,7 +45,7 @@ async def register(user_id: str, server_url: str) -> None:
                 server_url=server_url,
                 category="corpus",
                 enabled=True,
-                config={"timeout": 30.0},
+                config={"timeout": 60.0},
             )
             session.add(plugin)
         else:
@@ -55,7 +55,7 @@ async def register(user_id: str, server_url: str) -> None:
             plugin.server_url = server_url
             plugin.category = "corpus"
             plugin.enabled = True
-            plugin.config = plugin.config or {"timeout": 30.0}
+            plugin.config = plugin.config or {"timeout": 60.0}
         await session.commit()
 
 

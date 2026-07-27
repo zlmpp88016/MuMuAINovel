@@ -350,6 +350,88 @@ a {
   color: var(--tag-text);
 }
 
+.badge-pending {
+  background: #f1f2f4;
+  color: var(--text-secondary);
+}
+
+.badge-running {
+  background: #eef2ff;
+  color: var(--primary);
+}
+
+.badge-completed {
+  background: #e8f7ee;
+  color: var(--success);
+}
+
+.badge-failed {
+  background: #fdecec;
+  color: var(--danger);
+}
+
+.badge-interrupted {
+  background: #fff3e0;
+  color: #b26a00;
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.4rem 0;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-light);
+  overflow: hidden;
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.2s ease;
+}
+
+.badge-completed ~ .progress-bar span,
+.book-card:has(.badge-completed) .progress-bar span {
+  background: var(--success);
+}
+
+.book-card:has(.badge-failed) .progress-bar span {
+  background: var(--danger);
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  min-width: 3rem;
+  text-align: right;
+}
+
+.error-text {
+  margin: 0.25rem 0;
+  font-size: 0.78rem;
+  color: var(--danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-actions {
+  margin-top: 0.35rem;
+}
+
+.card-actions .btn {
+  height: 26px;
+  padding: 0 0.7rem;
+  font-size: 0.78rem;
+}
+
 .empty-list {
   color: var(--text-muted);
   font-size: 0.85rem;

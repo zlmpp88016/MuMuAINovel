@@ -20,7 +20,7 @@ class SessionInfo:
     last_access: float
     request_count: int = 0
     error_count: int = 0
-    status: str = "active"  # active, degraded, error
+    status: str = "active"  # 状态取值：active、degraded、error
 
 
 class MCPPluginRegistry:
@@ -34,7 +34,7 @@ class MCPPluginRegistry:
         """
         初始化注册表
         
-        Args:
+        参数：
             max_clients: 最大缓存客户端数量（默认使用配置）
             client_ttl: 客户端过期时间（秒，默认使用配置）
         """
@@ -152,10 +152,10 @@ class MCPPluginRegistry:
         """
         获取用户专属的锁（细粒度锁）
         
-        Args:
+        参数：
             user_id: 用户ID
             
-        Returns:
+        返回：
             该用户的锁对象
         """
         async with self._locks_lock:
@@ -167,7 +167,7 @@ class MCPPluginRegistry:
         """
         更新会话的最后访问时间（需要在锁内调用）
         
-        Args:
+        参数：
             plugin_id: 插件ID
         """
         if plugin_id in self._sessions:
@@ -195,10 +195,10 @@ class MCPPluginRegistry:
         """
         从配置加载插件
         
-        Args:
+        参数：
             plugin: 插件配置
             
-        Returns:
+        返回：
             是否加载成功
         """
         # 使用细粒度锁（只锁定当前用户）
@@ -258,7 +258,7 @@ class MCPPluginRegistry:
         """
         卸载插件
         
-        Args:
+        参数：
             user_id: 用户ID
             plugin_name: 插件名称
         """
@@ -285,10 +285,10 @@ class MCPPluginRegistry:
         """
         重新加载插件
         
-        Args:
+        参数：
             plugin: 插件配置
             
-        Returns:
+        返回：
             是否重载成功
         """
         await self.unload_plugin(plugin.user_id, plugin.plugin_name)
@@ -298,11 +298,11 @@ class MCPPluginRegistry:
         """
         获取插件客户端（线程安全，支持访问时间更新）
         
-        Args:
+        参数：
             user_id: 用户ID
             plugin_name: 插件名称
             
-        Returns:
+        返回：
             客户端实例或None
         """
         plugin_id = f"{user_id}:{plugin_name}"
@@ -334,15 +334,15 @@ class MCPPluginRegistry:
         """
         获取或重连客户端（自动处理错误状态）
         
-        Args:
+        参数：
             user_id: 用户ID
             plugin_name: 插件名称
             plugin: 插件配置对象
             
-        Returns:
+        返回：
             客户端实例
             
-        Raises:
+        抛出：
             ValueError: 插件加载失败
         """
         plugin_id = f"{user_id}:{plugin_name}"
@@ -378,16 +378,16 @@ class MCPPluginRegistry:
         """
         调用插件工具（带错误计数和状态管理）
         
-        Args:
+        参数：
             user_id: 用户ID
             plugin_name: 插件名称
             tool_name: 工具名称
             arguments: 工具参数
             
-        Returns:
+        返回：
             工具执行结果
             
-        Raises:
+        抛出：
             ValueError: 插件不存在或未启用
             MCPError: 工具调用失败
         """
@@ -397,10 +397,27 @@ class MCPPluginRegistry:
         session = self._sessions.get(plugin_id)
         if not session:
             raise ValueError(f"插件未加载: {plugin_name}")
+
+        started_at = time.perf_counter()
+        logger.info(
+            "🔧 [MCP调用][注册表] 转发调用 | 插件=%s | 工具=%s | "
+            "会话状态=%s | 参数字段=%s",
+            plugin_name,
+            tool_name,
+            session.status,
+            sorted(arguments),
+        )
         
         try:
             result = await session.client.call_tool(tool_name, arguments)
-            logger.info(f"✅ 工具调用成功: {plugin_name}.{tool_name}")
+            logger.info(
+                "✅ [MCP调用][注册表] 调用成功 | 工具=%s.%s | "
+                "耗时=%.2fms | 结果类型=%s",
+                plugin_name,
+                tool_name,
+                (time.perf_counter() - started_at) * 1000,
+                type(result).__name__,
+            )
             
             # 调用成功，重置状态（如果之前是degraded）
             if session.status == "degraded":
@@ -421,8 +438,15 @@ class MCPPluginRegistry:
                     session.status = "degraded"
             
             logger.error(
-                f"❌ 工具调用失败: {plugin_name}.{tool_name}, "
-                f"错误: {e} (错误计数: {session.error_count}/{session.request_count})"
+                "❌ [MCP调用][注册表] 调用失败 | 工具=%s.%s | "
+                "耗时=%.2fms | 错误类型=%s | 错误=%s | 错误计数=%d/%d",
+                plugin_name,
+                tool_name,
+                (time.perf_counter() - started_at) * 1000,
+                type(e).__name__,
+                e,
+                session.error_count,
+                session.request_count,
             )
             raise
     
@@ -434,11 +458,11 @@ class MCPPluginRegistry:
         """
         获取插件的工具列表
         
-        Args:
+        参数：
             user_id: 用户ID
             plugin_name: 插件名称
             
-        Returns:
+        返回：
             工具列表
         """
         client = self.get_client(user_id, plugin_name)
@@ -461,11 +485,11 @@ class MCPPluginRegistry:
         """
         测试插件连接
         
-        Args:
+        参数：
             user_id: 用户ID
             plugin_name: 插件名称
             
-        Returns:
+        返回：
             测试结果
         """
         client = self.get_client(user_id, plugin_name)

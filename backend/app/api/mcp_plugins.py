@@ -454,14 +454,14 @@ async def _ensure_plugin_loaded(
     """
     确保插件已加载（共享逻辑）
     
-    Args:
+    参数：
         plugin: 插件对象
         user_id: 用户ID
         
-    Returns:
+    返回：
         是否加载成功
         
-    Raises:
+    抛出：
         HTTPException: 加载失败
     """
     if not mcp_registry.get_client(user_id, plugin.plugin_name):
@@ -486,7 +486,7 @@ async def get_metrics(
     Query参数:
         - tool_name: 可选，指定工具名称获取特定工具的指标
         
-    Returns:
+    返回：
         工具调用指标字典，包含：
         - total_calls: 总调用次数
         - success_calls: 成功调用次数
@@ -511,7 +511,7 @@ async def get_cache_stats(
     """
     获取工具缓存统计信息
     
-    Returns:
+    返回：
         缓存统计信息，包含：
         - total_entries: 缓存条目总数
         - total_hits: 缓存总命中次数

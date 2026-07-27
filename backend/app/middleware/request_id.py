@@ -18,11 +18,11 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         """
         处理请求，添加追踪ID
         
-        Args:
+        参数：
             request: 请求对象
             call_next: 下一个处理器
             
-        Returns:
+        返回：
             响应对象
         """
         # 从请求头获取追踪ID，或生成新的
@@ -58,7 +58,7 @@ class RequestIDFilter(logging.Filter):
         """
         初始化过滤器
         
-        Args:
+        参数：
             request_id: 请求追踪ID
         """
         super().__init__()
@@ -68,10 +68,10 @@ class RequestIDFilter(logging.Filter):
         """
         为日志记录添加request_id属性
         
-        Args:
+        参数：
             record: 日志记录
             
-        Returns:
+        返回：
             True（不过滤任何日志）
         """
         record.request_id = self.request_id

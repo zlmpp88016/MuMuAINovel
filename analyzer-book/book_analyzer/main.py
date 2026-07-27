@@ -23,6 +23,7 @@ from book_analyzer.db import (
     ensure_schema_compatibility,
 )
 from book_analyzer.llm_service import AIService
+from book_analyzer.logging_config import configure_logging
 from book_analyzer.models import Base
 from book_analyzer.service import BookAnalysisService
 from book_analyzer.vector_store import create_vector_store
@@ -30,21 +31,19 @@ from book_analyzer.vector_store import create_vector_store
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    datefmt="%H:%M:%S",
-)
+configure_logging()
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     """创建配置好的 FastAPI 应用。
 
-    Args:
+    参数：
         settings: 可选运行配置。测试会传入临时路径配置；生产运行默认从
             ``BOOK_ANALYZER_*`` 环境变量读取。
 
-    Returns:
+    返回：
         已挂载路由和 lifespan 初始化逻辑的 FastAPI 实例。
     """
     resolved_settings = settings or Settings.from_env()
@@ -58,7 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         """初始化并清理应用级依赖。
 
-        Args:
+        参数：
             app: 当前 FastAPI 应用实例，依赖对象会挂载到 ``app.state``。
         """
         Base.metadata.create_all(engine)
@@ -91,6 +90,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             vector_store=vector_store,
             analyzer=analyzer,
         )
+        # 上次进程可能被硬杀，留下 status=running 的书籍：启动时标记为中断，
+        # 前端展示「继续」按钮，从断点恢复而非僵在 running。
+        interrupted = app.state.book_service.interrupt_running_books()
+        if interrupted:
+            logger.info("启动时标记 %d 本 running 书籍为中断", interrupted)
         try:
             yield
         finally:

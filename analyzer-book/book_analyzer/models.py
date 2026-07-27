@@ -1,7 +1,7 @@
-"""SQLAlchemy ORM models.
+"""SQLAlchemy ORM 数据模型。
 
 这里只定义 book-analyzer 自己的元数据表，不依赖主项目 backend 的模型。
-向量内容保存在 Chroma 或 fallback store 中，数据库只保存可回显和可重建索引的元数据。
+向量内容保存在 Chroma 或兜底向量存储中，数据库只保存可回显和可重建索引的元数据。
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
-    """SQLAlchemy declarative base for all local tables."""
+    """所有本地数据表共用的 SQLAlchemy 声明式基类。"""
 
 
 def utc_now() -> datetime:

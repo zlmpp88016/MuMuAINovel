@@ -47,10 +47,10 @@ async def get_engine(user_id: str):
     
     PostgreSQL: 所有用户共享一个数据库，通过user_id字段隔离数据
     
-    Args:
+    参数：
         user_id: 用户ID
         
-    Returns:
+    返回：
         用户专属的异步引擎
     """
     # PostgreSQL模式：所有用户共享同一个引擎
@@ -179,7 +179,7 @@ async def get_db(request: Request):
 async def _init_relationship_types(user_id: str):
     """为指定用户初始化预置的关系类型数据
     
-    Args:
+    参数：
         user_id: 用户ID
     """
     from app.models.relationship import RelationshipType
@@ -247,7 +247,7 @@ async def _init_global_writing_styles(user_id: str):
     全局预设风格的 project_id 为 NULL，所有用户共享
     只在第一次创建数据库时插入一次
     
-    Args:
+    参数：
         user_id: 用户ID
     """
     from app.models.writing_style import WritingStyle
@@ -300,7 +300,7 @@ async def _init_global_writing_styles(user_id: str):
 async def init_db(user_id: str):
     """初始化指定用户的数据库,创建所有表并插入预置数据
     
-    Args:
+    参数：
         user_id: 用户ID
     """
     try:
@@ -335,7 +335,7 @@ async def close_db():
 async def get_database_stats():
     """获取数据库连接和会话统计信息
     
-    Returns:
+    返回：
         dict: 包含数据库统计信息的字典
     """
     from app.config import settings
@@ -398,10 +398,10 @@ async def get_database_stats():
 async def check_database_health(user_id: str = None) -> dict:
     """检查数据库连接健康状态
     
-    Args:
+    参数：
         user_id: 可选的用户ID，如果提供则检查特定用户的数据库
         
-    Returns:
+    返回：
         dict: 健康检查结果
     """
     result = {

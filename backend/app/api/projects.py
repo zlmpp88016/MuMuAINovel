@@ -408,7 +408,7 @@ async def check_project_consistency(
     """
     检查并修复项目的数据一致性问题
     
-    Args:
+    参数：
         project_id: 项目ID
         auto_fix: 是否自动修复问题（默认True）
     
@@ -560,11 +560,11 @@ async def export_project_data(
     """
     导出项目完整数据为JSON格式
     
-    Args:
+    参数：
         project_id: 项目ID
         options: 导出选项
     
-    Returns:
+    返回：
         JSON文件下载
     """
     try:
@@ -632,10 +632,10 @@ async def validate_import_file(
     """
     验证导入文件的格式和内容
     
-    Args:
+    参数：
         file: 上传的JSON文件
     
-    Returns:
+    返回：
         验证结果
     """
     try:
@@ -681,10 +681,10 @@ async def import_project(
     """
     导入项目数据（创建新项目）
     
-    Args:
+    参数：
         file: 上传的JSON文件
     
-    Returns:
+    返回：
         导入结果
     """
     try:

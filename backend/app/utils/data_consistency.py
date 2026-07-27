@@ -19,14 +19,14 @@ async def ensure_organization_record(
     """
     确保组织角色拥有对应的Organization记录
     
-    Args:
+    参数：
         character: Character对象（必须是is_organization=True）
         db: 数据库会话
         power_level: 势力等级（默认50）
         location: 所在地
         motto: 宗旨/口号
         
-    Returns:
+    返回：
         Organization对象，如果character不是组织则返回None
     """
     if not character.is_organization:
@@ -66,11 +66,11 @@ async def sync_organization_member_count(
     """
     同步组织的成员计数，从实际成员记录计算
     
-    Args:
+    参数：
         organization: Organization对象
         db: 数据库会话
         
-    Returns:
+    返回：
         实际成员数量
     """
     result = await db.execute(
@@ -102,11 +102,11 @@ async def fix_missing_organization_records(
     
     为所有is_organization=True但没有Organization记录的Character创建记录
     
-    Args:
+    参数：
         project_id: 项目ID
         db: 数据库会话
         
-    Returns:
+    返回：
         (修复数量, 检查总数)
     """
     # 查找所有组织角色
@@ -142,11 +142,11 @@ async def fix_organization_member_counts(
     """
     修复项目中所有组织的成员计数
     
-    Args:
+    参数：
         project_id: 项目ID
         db: 数据库会话
         
-    Returns:
+    返回：
         (修复数量, 检查总数)
     """
     # 查找所有组织
@@ -177,11 +177,11 @@ async def validate_relationships(
     
     检查所有关系中的character_from_id和character_to_id是否都指向存在的角色
     
-    Args:
+    参数：
         project_id: 项目ID
         db: 数据库会话
         
-    Returns:
+    返回：
         问题列表，每个问题包含 {issue_type, relationship_id, details}
     """
     issues = []
@@ -234,11 +234,11 @@ async def validate_organization_members(
     
     检查所有成员关系中的organization_id和character_id是否都有效
     
-    Args:
+    参数：
         project_id: 项目ID
         db: 数据库会话
         
-    Returns:
+    返回：
         问题列表
     """
     issues = []
@@ -294,12 +294,12 @@ async def run_full_data_consistency_check(
     """
     对项目运行完整的数据一致性检查和修复
     
-    Args:
+    参数：
         project_id: 项目ID
         db: 数据库会话
         auto_fix: 是否自动修复问题（默认True）
         
-    Returns:
+    返回：
         检查报告字典
     """
     logger.info(f"🔍 开始数据一致性检查 - 项目 {project_id}")

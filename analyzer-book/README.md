@@ -65,17 +65,58 @@ Chroma 默认使用 `BOOK_ANALYZER_VECTOR_BACKEND=auto`：依赖和 embedding �
 ## 启动
 
 ```bash
-pip install -r book-analyzer/requirements.txt
+pip install -r analyzer-book/requirements.txt
 ```
 
 ```bash
-uvicorn book_analyzer.main:app --reload --app-dir book-analyzer
+uvicorn book_analyzer.main:app --reload --app-dir analyzer-book
 ```
 
 启动后访问：
 
 - 页面：`http://127.0.0.1:8000/`
 - API 文档：`http://127.0.0.1:8000/docs`
+
+## MCP 服务
+
+MCP 服务与管理用 HTTP API 独立启动，共享 analyzer-book 自己的数据库和
+Chroma 索引。在仓库根目录执行：
+
+```bash
+cd analyzer-book
+python -m book_analyzer.mcp_server
+```
+
+默认 endpoint 为 `http://127.0.0.1:8765/mcp`。如需跨机器访问，请通过
+`BOOK_ANALYZER_MCP_HOST` 和 `BOOK_ANALYZER_MCP_PORT` 配置监听地址，并在
+外层增加 TLS、鉴权和网络访问控制，不要直接将无认证服务暴露到公网。
+
+当前提供 6 个只读 tools：
+
+- `corpus_search_reference_passages`：检索场景与文风参考片段；
+- `corpus_get_highlight_passages`：检索去 AI 味校准片段；
+- `corpus_get_style_profile`：读取书级风格画像；
+- `corpus_search_plot_patterns`：返回去情节化的节拍与冲突模式；
+- `corpus_search_character_archetypes`：返回匿名角色原型；
+- `corpus_find_foreshadow_patterns`：返回伏笔埋设、回收或配对技法。
+
+可用真实 streamable HTTP 检查工具发现和 schema：
+
+```bash
+python scripts/check_mcp_contract.py
+```
+
+固定查询评测会输出 P95、跨书多样性、标签命中率以及已人工标注查询的
+Recall@K/Precision@K。`relevant_book_ids` 在
+`benchmarks/corpus_queries.json` 中维护；少于 50 本时规模门禁应保持
+`blocked`：
+
+```bash
+python scripts/benchmark_corpus.py --corpus-book-count 50 --summary-only
+```
+
+如果本机未安装 Chroma，而 `.env` 显式配置了 `vector_backend=chroma`，可先用
+`BOOK_ANALYZER_VECTOR_BACKEND=simple` 启动进行契约检查。
 
 ## 测试
 

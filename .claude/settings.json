@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "mcp__codexlens__Search"
+      "mcp__codexlens__Search",
+      "Bash(ls pyproject.toml)",
+      "Bash(ls setup.cfg)",
+      "Bash(ls pytest.ini)"
     ]
   }
 }

@@ -71,9 +71,9 @@ class MemoryService:
 
         logger.info(f"📂 当前工作目录: {os.getcwd()}")
         logger.info(f"📂 模型缓存目录: {os.path.abspath(model_cache_dir)}")
-        logger.info(f"🔧 SENTENCE_TRANSFORMERS_HOME: {os.environ.get('SENTENCE_TRANSFORMERS_HOME', '未设置')}")
-        logger.info(f"🔧 TRANSFORMERS_OFFLINE: {os.environ.get('TRANSFORMERS_OFFLINE', '未设置')}")
-        logger.info(f"🔧 HF_HUB_OFFLINE: {os.environ.get('HF_HUB_OFFLINE', '未设置')}")
+        logger.info(f"🔧 环境变量 SENTENCE_TRANSFORMERS_HOME: {os.environ.get('SENTENCE_TRANSFORMERS_HOME', '未设置')}")
+        logger.info(f"🔧 环境变量 TRANSFORMERS_OFFLINE: {os.environ.get('TRANSFORMERS_OFFLINE', '未设置')}")
+        logger.info(f"🔧 环境变量 HF_HUB_OFFLINE: {os.environ.get('HF_HUB_OFFLINE', '未设置')}")
 
         if os.path.exists(model_cache_dir):
             logger.info(f"📁 模型目录存在，检查内容...")
@@ -197,11 +197,11 @@ class MemoryService:
 
         每个用户的每个项目有独立的collection,实现数据隔离
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
 
-        Returns:
+        返回：
             ChromaDB Collection对象
         """
         user_hash = hashlib.sha256(user_id.encode()).hexdigest()[:8]
@@ -240,7 +240,7 @@ class MemoryService:
         """
         添加记忆到向量数据库
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
             memory_id: 记忆唯一ID
@@ -248,7 +248,7 @@ class MemoryService:
             memory_type: 记忆类型
             metadata: 附加元数据
 
-        Returns:
+        返回：
             是否添加成功
         """
         try:
@@ -298,12 +298,12 @@ class MemoryService:
         """
         批量添加记忆(性能更好)
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
             memories: 记忆列表,每个包含id、content、type、metadata
 
-        Returns:
+        返回：
             成功添加的数量
         """
         if not memories:
@@ -365,7 +365,7 @@ class MemoryService:
         """
         语义搜索相关记忆
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
             query: 查询文本(会被转换为向量进行相似度搜索)
@@ -374,7 +374,7 @@ class MemoryService:
             min_importance: 最低重要性阈值
             chapter_range: 章节范围 (start, end)
 
-        Returns:
+        返回：
             相关记忆列表,按相似度排序
         """
         try:
@@ -437,14 +437,14 @@ class MemoryService:
         """
         获取最近几章的重要记忆(用于保持连贯性)
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
             current_chapter: 当前章节号
             recent_count: 获取最近几章
             min_importance: 最低重要性阈值
 
-        Returns:
+        返回：
             最近章节的记忆列表,按重要性排序
         """
         try:
@@ -497,12 +497,12 @@ class MemoryService:
         """
         查找未完结的伏笔
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
             current_chapter: 当前章节号
 
-        Returns:
+        返回：
             未完结伏笔列表
         """
         try:
@@ -552,14 +552,14 @@ class MemoryService:
 
         这是核心功能: 结合多种检索策略,为AI生成提供最相关的记忆
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
             current_chapter: 当前章节号
             chapter_outline: 本章大纲
             character_names: 涉及的角色名列表
 
-        Returns:
+        返回：
             包含各种上下文信息的字典
         """
         logger.info(f"🧠 开始构建章节{current_chapter}的智能上下文...")
@@ -666,12 +666,12 @@ class MemoryService:
         """
         删除指定章节的所有记忆
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
             chapter_id: 章节ID
 
-        Returns:
+        返回：
             是否删除成功
         """
         try:
@@ -701,11 +701,11 @@ class MemoryService:
         """
         删除指定项目的所有记忆(包括向量数据库)
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
 
-        Returns:
+        返回：
             是否删除成功
         """
         try:
@@ -740,14 +740,14 @@ class MemoryService:
         """
         更新记忆内容或元数据
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
             memory_id: 记忆ID
             content: 新内容(可选)
             metadata: 新元数据(可选)
 
-        Returns:
+        返回：
             是否更新成功
         """
         try:
@@ -792,11 +792,11 @@ class MemoryService:
         """
         获取记忆统计信息
 
-        Args:
+        参数：
             user_id: 用户ID
             project_id: 项目ID
 
-        Returns:
+        返回：
             统计信息字典
         """
         try:

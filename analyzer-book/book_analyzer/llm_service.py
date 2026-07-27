@@ -45,7 +45,7 @@ class AIService:
     ) -> None:
         """初始化模型客户端和默认生成参数。
 
-        Args:
+        参数：
             settings: book-analyzer 的独立配置对象。
             api_provider: 可选模型提供方，支持 ``openai`` 或 ``anthropic``。
             api_key: 可选 API key；为空时按 provider 回退到全局配置。
@@ -114,10 +114,10 @@ class AIService:
     def is_available(self, provider: str | None = None) -> bool:
         """检查指定 provider 是否已具备发起请求的必要配置。
 
-        Args:
+        参数：
             provider: 可选 provider；为空时检查当前实例的 provider。
 
-        Returns:
+        返回：
             ``True`` 表示客户端和 key 都已准备好。
         """
         resolved_provider = provider or self.api_provider
@@ -138,7 +138,7 @@ class AIService:
     ) -> dict[str, Any]:
         """使用配置好的 provider 生成文本。
 
-        Args:
+        参数：
             prompt: 用户提示词。
             provider: 单次调用覆盖 provider。
             model: 单次调用覆盖模型名。
@@ -146,10 +146,10 @@ class AIService:
             max_tokens: 单次调用覆盖最大输出 token 数。
             system_prompt: 可选系统提示词。
 
-        Returns:
+        返回：
             包含 ``content`` 和 ``finish_reason`` 的统一响应字典。
 
-        Raises:
+        抛出：
             ValueError: provider 不支持或底层客户端未初始化。
         """
         resolved_provider = provider or self.api_provider
@@ -200,14 +200,14 @@ class AIService:
     ) -> str:
         """调用 OpenAI-compatible chat completions 接口。
 
-        Args:
+        参数：
             prompt: 用户提示词。
             model: 模型名称。
             temperature: 采样温度。
             max_tokens: 最大输出 token 数。
             system_prompt: 可选系统提示词。
 
-        Returns:
+        返回：
             模型返回的文本内容。
         """
         if not self.openai_http_client:
@@ -228,9 +228,7 @@ class AIService:
                 "model": model,
                 "messages": messages,
                 "temperature": temperature,
-                # "max_tokens": max_tokens,
             }
-
         max_retries = 3
         for attempt in range(max_retries):
             try:
@@ -247,6 +245,13 @@ class AIService:
                 message = choices[0].get("message", {})
                 content = message.get("content", "")
                 if not content:
+                    if attempt < max_retries - 1:
+                        logger.warning(
+                            "OpenAI 返回空 content (model=%s)，第 %d/%d 次重试",
+                            model, attempt + 1, max_retries,
+                        )
+                        await asyncio.sleep(2 ** attempt)
+                        continue
                     logger.error(
                         "OpenAI 返回了空内容 url:%s/chat/completions, response:%s",
                         self.openai_base_url, payload,
@@ -285,14 +290,14 @@ class AIService:
     ) -> str:
         """调用 Anthropic messages 接口。
 
-        Args:
+        参数：
             prompt: 用户提示词。
             model: 模型名称。
             temperature: 采样温度。
             max_tokens: 最大输出 token 数。
             system_prompt: 可选系统提示词。
 
-        Returns:
+        返回：
             合并后的文本块内容。
         """
         if not self.anthropic_client:

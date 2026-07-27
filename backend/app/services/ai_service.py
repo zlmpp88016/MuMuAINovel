@@ -25,7 +25,7 @@ class AIService:
         """
         初始化AI客户端（优化并发性能）
         
-        Args:
+        参数：
             api_provider: API提供商 (openai/anthropic)，为None时使用全局配置
             api_key: API密钥，为None时使用全局配置
             api_base_url: API基础URL，为None时使用全局配置
@@ -138,7 +138,7 @@ class AIService:
         """
         生成文本（支持工具调用）
         
-        Args:
+        参数：
             prompt: 用户提示词
             provider: AI提供商 (openai/anthropic)
             model: 模型名称
@@ -148,7 +148,7 @@ class AIService:
             tools: 可用工具列表（MCP工具格式）
             tool_choice: 工具选择策略 (auto/required/none)
             
-        Returns:
+        返回：
             Dict包含:
             - content: 文本内容（如果没有工具调用）
             - tool_calls: 工具调用列表（如果AI决定调用工具）
@@ -182,7 +182,7 @@ class AIService:
         """
         流式生成文本
         
-        Args:
+        参数：
             prompt: 用户提示词
             provider: AI提供商
             model: 模型名称
@@ -190,7 +190,7 @@ class AIService:
             max_tokens: 最大token数
             system_prompt: 系统提示词
             
-        Yields:
+        生成：
             生成的文本片段
         """
         provider = provider or self.api_provider
@@ -650,7 +650,7 @@ class AIService:
         """
         支持MCP工具的AI文本生成（非流式）
         
-        Args:
+        参数：
             prompt: 用户提示词
             user_id: 用户ID，用于获取MCP工具
             db_session: 数据库会话
@@ -659,7 +659,7 @@ class AIService:
             tool_choice: 工具选择策略（auto/required/none）
             **kwargs: 其他AI参数（provider, model, temperature等）
         
-        Returns:
+        返回：
             {
                 "content": "AI生成的最终文本",
                 "tool_calls_made": 2,  # 实际调用的工具次数
@@ -678,6 +678,15 @@ class AIService:
             "finish_reason": "",
             "mcp_enhanced": False
         }
+        logger.info(
+            "🔧 [MCP调用][规划开始] user_id=%s | enable_mcp=%s | "
+            "最大轮次=%d | tool_choice=%s | prompt字符数=%d",
+            user_id,
+            enable_mcp,
+            max_tool_rounds,
+            tool_choice,
+            len(prompt),
+        )
         
         # 1. 获取MCP工具（如果启用）
         tools = None
@@ -688,11 +697,23 @@ class AIService:
                     db_session=db_session
                 )
                 if tools:
-                    logger.info(f"MCP增强: 加载了 {len(tools)} 个工具")
+                    tool_names = [
+                        tool.get("function", {}).get("name", "unknown")
+                        for tool in tools
+                    ]
+                    logger.info(
+                        "🔧 [MCP调用][工具发现] 已加载 %d 个工具 | 工具=%s",
+                        len(tools),
+                        tool_names,
+                    )
                     result["mcp_enhanced"] = True
+                else:
+                    logger.info("🔧 [MCP调用][工具发现] 没有可用工具，将直接生成内容")
             except MCPToolServiceError as e:
-                logger.error(f"获取MCP工具失败，降级为普通生成: {e}")
+                logger.error(f"❌ [MCP调用][工具发现] 获取失败，降级为普通生成: {e}")
                 tools = None
+        else:
+            logger.info("🔧 [MCP调用][工具发现] MCP 未启用，跳过工具发现")
         
         # 2. 工具调用循环
         conversation_history = [
@@ -700,11 +721,18 @@ class AIService:
         ]
         
         for round_num in range(max_tool_rounds):
-            logger.info(f"MCP工具调用轮次: {round_num + 1}/{max_tool_rounds}")
+            round_prompt = conversation_history[-1]["content"]
+            logger.info(
+                "🔧 [MCP调用][规划轮次] 第 %d/%d 轮 | prompt字符数=%d | 携带工具=%s",
+                round_num + 1,
+                max_tool_rounds,
+                len(round_prompt),
+                bool(tools and round_num == 0),
+            )
             
             # 调用AI
             ai_response = await self.generate_text(
-                prompt=conversation_history[-1]["content"],
+                prompt=round_prompt,
                 tools=tools if round_num == 0 else None,  # 只在第一轮传递工具
                 tool_choice=tool_choice if round_num == 0 else None,
                 **kwargs
@@ -717,10 +745,26 @@ class AIService:
                 # AI返回最终内容
                 result["content"] = ai_response.get("content", "")
                 result["finish_reason"] = ai_response.get("finish_reason", "stop")
+                logger.info(
+                    "✅ [MCP调用][规划轮次] 第 %d 轮未请求工具 | "
+                    "finish_reason=%s | 内容字符数=%d",
+                    round_num + 1,
+                    result["finish_reason"],
+                    len(result["content"]),
+                )
                 break
             
             # 3. 执行工具调用
-            logger.info(f"AI请求调用 {len(tool_calls)} 个工具")
+            requested_tools = [
+                tool_call.get("function", {}).get("name", "unknown")
+                for tool_call in tool_calls
+            ]
+            logger.info(
+                "🔧 [MCP调用][执行请求] 第 %d 轮请求 %d 个工具 | 工具=%s",
+                round_num + 1,
+                len(tool_calls),
+                requested_tools,
+            )
             
             try:
                 tool_results = await mcp_tool_service.execute_tool_calls(
@@ -736,11 +780,25 @@ class AIService:
                         result["tools_used"].append(tool_name)
                 
                 result["tool_calls_made"] += len(tool_calls)
+                success_count = sum(
+                    1 for tool_result in tool_results if tool_result.get("success")
+                )
+                logger.info(
+                    "✅ [MCP调用][执行结果] 第 %d 轮完成 | 成功=%d | 失败=%d",
+                    round_num + 1,
+                    success_count,
+                    len(tool_results) - success_count,
+                )
                 
                 # 4. 构建工具上下文
                 tool_context = await mcp_tool_service.build_tool_context(
                     tool_results,
                     format="markdown"
+                )
+                logger.info(
+                    "🔧 [MCP调用][上下文] 第 %d 轮工具上下文字符数=%d",
+                    round_num + 1,
+                    len(tool_context),
                 )
                 
                 # 5. 更新对话历史
@@ -769,7 +827,7 @@ class AIService:
                 })
                 
             except Exception as e:
-                logger.error(f"执行MCP工具失败: {e}", exc_info=True)
+                logger.error(f"❌ [MCP调用][执行失败] {e}", exc_info=True)
                 # 降级：返回当前AI响应
                 result["content"] = ai_response.get("content", "")
                 result["finish_reason"] = "tool_error"
@@ -777,10 +835,19 @@ class AIService:
         
         else:
             # 达到最大轮次
-            logger.warning(f"达到MCP最大调用轮次 {max_tool_rounds}")
+            logger.warning(f"⚠️ [MCP调用][规划结束] 达到最大调用轮次 {max_tool_rounds}")
             result["content"] = conversation_history[-1].get("content", "")
             result["finish_reason"] = "max_rounds"
         
+        logger.info(
+            "✅ [MCP调用][规划结束] enhanced=%s | 工具调用次数=%d | "
+            "使用工具=%s | finish_reason=%s | 内容字符数=%d",
+            result["mcp_enhanced"],
+            result["tool_calls_made"],
+            result["tools_used"],
+            result["finish_reason"],
+            len(result["content"]),
+        )
         return result
     
     async def generate_text_stream_with_mcp(
@@ -795,7 +862,7 @@ class AIService:
         """
         支持MCP工具的AI流式文本生成（两阶段模式）
         
-        Args:
+        参数：
             prompt: 用户提示词
             user_id: 用户ID
             db_session: 数据库会话
@@ -803,13 +870,20 @@ class AIService:
             mcp_planning_prompt: MCP规划阶段的提示词（可选）
             **kwargs: 其他AI参数
         
-        Yields:
+        生成：
             流式文本chunk
         """
         from app.services.mcp_tool_service import mcp_tool_service
         
         # 阶段1: 工具调用阶段（非流式）
         enhanced_prompt = prompt
+        logger.info(
+            "🔧 [MCP调用][流式阶段1] 开始工具规划 | user_id=%s | "
+            "enable_mcp=%s | 原始prompt字符数=%d",
+            user_id,
+            enable_mcp,
+            len(prompt),
+        )
         
         if enable_mcp:
             try:
@@ -820,7 +894,10 @@ class AIService:
                 )
                 
                 if tools:
-                    logger.info(f"MCP增强（流式）: 加载了 {len(tools)} 个工具")
+                    logger.info(
+                        "🔧 [MCP调用][流式阶段1] 加载了 %d 个工具",
+                        len(tools),
+                    )
                     
                     # 使用规划提示让AI决定需要查询什么
                     if not mcp_planning_prompt:
@@ -849,19 +926,40 @@ class AIService:
                             f"{planning_result.get('content', '')}"
                         )
                         logger.info(
-                            f"MCP工具规划完成，调用了 "
-                            f"{planning_result['tool_calls_made']} 次工具"
+                            "✅ [MCP调用][流式阶段1] 工具规划完成 | "
+                            "工具调用次数=%d | 增强prompt字符数=%d",
+                            planning_result["tool_calls_made"],
+                            len(enhanced_prompt),
                         )
+                    else:
+                        logger.info("🔧 [MCP调用][流式阶段1] 规划完成，未调用工具")
+                else:
+                    logger.info("🔧 [MCP调用][流式阶段1] 没有可用工具")
             
             except Exception as e:
-                logger.error(f"MCP工具规划失败，使用原始提示: {e}")
+                logger.error(f"❌ [MCP调用][流式阶段1] 规划失败，使用原始提示: {e}")
+        else:
+            logger.info("🔧 [MCP调用][流式阶段1] MCP 未启用，使用原始提示")
         
         # 阶段2: 内容生成阶段（流式）
+        logger.info(
+            "🤖 [MCP调用][流式阶段2] 开始生成内容 | 最终prompt字符数=%d",
+            len(enhanced_prompt),
+        )
+        chunk_count = 0
+        generated_chars = 0
         async for chunk in self.generate_text_stream(
             prompt=enhanced_prompt,
             **kwargs
         ):
+            chunk_count += 1
+            generated_chars += len(chunk)
             yield chunk
+        logger.info(
+            "✅ [MCP调用][流式阶段2] 内容生成完成 | chunks=%d | 生成字符数=%d",
+            chunk_count,
+            generated_chars,
+        )
 
 
 # 创建全局AI服务实例
@@ -879,7 +977,7 @@ def create_user_ai_service(
     """
     根据用户设置创建AI服务实例
     
-    Args:
+    参数：
         api_provider: API提供商
         api_key: API密钥
         api_base_url: API基础URL
@@ -887,7 +985,7 @@ def create_user_ai_service(
         temperature: 温度参数
         max_tokens: 最大tokens
         
-    Returns:
+    返回：
         AIService实例
     """
     return AIService(

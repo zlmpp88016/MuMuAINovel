@@ -2,6 +2,15 @@ const state = {
   selectedFile: null,
   selectedBookId: null,
   books: [],
+  analyzingBooks: new Set(),
+};
+
+const STATUS_LABEL = {
+  pending: "待分析",
+  running: "分析中",
+  completed: "已完成",
+  failed: "出错",
+  interrupted: "中断",
 };
 
 const els = {
@@ -66,6 +75,33 @@ function renderTags(tags) {
 
 /* ============ 书籍列表 ============ */
 
+function statusLabel(status) {
+  return STATUS_LABEL[status] || status;
+}
+
+function progressBarHtml(book) {
+  const total = book.total_chunks != null ? book.total_chunks : null;
+  const done = book.completed_chunks != null ? book.completed_chunks : null;
+  const pct = Math.max(0, Math.min(100, book.progress || 0));
+  const counter = total != null && done != null ? `${done}/${total}` : `${pct}%`;
+  return `
+    <div class="progress-row">
+      <div class="progress-bar"><span style="width:${pct}%"></span></div>
+      <span class="progress-text">${escapeHtml(counter)}</span>
+    </div>`;
+}
+
+function analyzeButtonHtml(book) {
+  if (book.status === "running") {
+    return `<button class="btn btn-ghost btn-analyze" data-analyze-id="${escapeHtml(book.id)}" data-monitor="1">查看进度</button>`;
+  }
+  if (book.status === "completed") {
+    return ``;
+  }
+  const label = book.status === "failed" || book.status === "interrupted" ? "继续分析" : "开始分析";
+  return `<button class="btn btn-primary btn-analyze" data-analyze-id="${escapeHtml(book.id)}">${label}</button>`;
+}
+
 function renderBookList() {
   if (!state.books.length) {
     els.bookList.innerHTML = '<p class="empty-list">暂无书籍，上传一本 TXT。</p>';
@@ -73,15 +109,23 @@ function renderBookList() {
   }
   els.bookList.innerHTML = state.books
     .map(
-      (b) => `
+      (b) => {
+        const errorLine = b.status === "failed" && b.error_message
+          ? `<p class="error-text" title="${escapeHtml(b.error_message)}">${escapeHtml(b.error_message)}</p>`
+          : "";
+        return `
     <article class="book-card ${b.id === state.selectedBookId ? "active" : ""}" data-book-id="${escapeHtml(b.id)}">
       <h3>${escapeHtml(b.title)}</h3>
       <div class="book-meta">
-        <span class="badge">${escapeHtml(b.status)}</span>
+        <span class="badge badge-${escapeHtml(b.status)}">${statusLabel(b.status)}</span>
         <span>${escapeHtml(b.original_filename)}</span>
         <span>${formatTime(b.updated_at)}</span>
       </div>
-    </article>`
+      ${progressBarHtml(b)}
+      ${errorLine}
+      <div class="card-actions">${analyzeButtonHtml(b)}</div>
+    </article>`;
+      }
     )
     .join("");
 }
@@ -138,6 +182,13 @@ async function loadBooks() {
   els.bookList.innerHTML = '<p class="empty-list">加载中…</p>';
   state.books = await fetchJson("/api/books");
   renderBookList();
+  // 后台任务仍在跑的书：自动重连 SSE 监控进度（刷新页面 / 重启程序后恢复查看）。
+  for (const b of state.books) {
+    if (b.status === "running" && !state.analyzingBooks.has(b.id)) {
+      state.analyzingBooks.add(b.id);
+      connectAnalyze(b.id);
+    }
+  }
 }
 
 async function selectBook(bookId) {
@@ -159,10 +210,10 @@ async function uploadSelectedFile() {
   formData.append("file", state.selectedFile);
 
   els.uploadButton.disabled = true;
-  setMessage("上传分析中…");
+  setMessage("上传中…");
   try {
     const book = await fetchJson("/api/books/upload", { method: "POST", body: formData });
-    setMessage(`分析完成：${book.title}`, "success");
+    setMessage(`上传完成：${book.title}，可点击“开始分析”`, "success");
     await loadBooks();
     await selectBook(book.id);
   } catch (err) {
@@ -172,7 +223,92 @@ async function uploadSelectedFile() {
   }
 }
 
+function patchBook(bookId, patch) {
+  const idx = state.books.findIndex((b) => b.id === bookId);
+  if (idx === -1) return;
+  state.books[idx] = { ...state.books[idx], ...patch };
+  renderBookList();
+  if (state.selectedBookId === bookId) {
+    fetchJson(`/api/books/${encodeURIComponent(bookId)}`).then(renderDetail).catch(() => {});
+  }
+}
+
+async function startAnalyze(bookId, monitor = false) {
+  if (state.analyzingBooks.has(bookId)) return;
+  state.analyzingBooks.add(bookId);
+  if (!monitor) patchBook(bookId, { status: "running", stage: "analyzing", progress: 0 });
+  setMessage(monitor ? "连接后台进度…" : "开始分析…");
+
+  connectAnalyze(bookId);
+}
+
+function connectAnalyze(bookId) {
+  const evtSource = new EventSource(`/api/books/${encodeURIComponent(bookId)}/analyze`);
+  evtSource.addEventListener("progress", (e) => {
+    const data = JSON.parse(e.data);
+    patchBook(bookId, {
+      status: "running",
+      stage: data.stage,
+      progress: data.progress,
+      completed_chunks: data.completed_chunks,
+      total_chunks: data.total_chunks,
+      error_message: null,
+    });
+  });
+  evtSource.addEventListener("done", (e) => {
+    JSON.parse(e.data);
+    patchBook(bookId, {
+      status: "completed",
+      stage: "done",
+      progress: 100,
+      error_message: null,
+    });
+    setMessage("分析完成", "success");
+    evtSource.close();
+    state.analyzingBooks.delete(bookId);
+  });
+  evtSource.addEventListener("error", (e) => {
+    let msg = "分析中断";
+    let status = "failed";
+    try {
+      if (e.data) {
+        const data = JSON.parse(e.data);
+        msg = data.message || msg;
+        status = data.status === "interrupted" ? "interrupted" : "failed";
+      }
+    } catch (_) {}
+    patchBook(bookId, { status, error_message: msg });
+    setMessage(msg, "error");
+    evtSource.close();
+    state.analyzingBooks.delete(bookId);
+  });
+}
+
 /* ============ 文件预览 ============ */
+
+async function readFileText(file) {
+  const buf = await file.arrayBuffer();
+  const utf8 = new TextDecoder("utf-8").decode(buf);
+
+  // UTF-8 is very strict — a GBK/GB2312 file decoded as UTF-8 will almost
+  // always produce replacement characters. If there are none, it's UTF-8.
+  if ((utf8.match(/�/g) || []).length === 0) {
+    return utf8;
+  }
+
+  // UTF-8 had errors, try Chinese encodings and pick the cleanest.
+  const encodings = ["gb18030", "gbk", "gb2312", "big5"];
+  let best = { text: utf8, errors: Infinity };
+  for (const enc of encodings) {
+    const text = new TextDecoder(enc).decode(buf);
+    const errors = (text.match(/�/g) || []).length;
+    if (errors < best.errors) {
+      best = { text, errors };
+    }
+    if (errors === 0) break;
+  }
+  return best.text;
+}
 
 async function previewFile(file) {
   state.selectedFile = file;
@@ -187,7 +323,7 @@ async function previewFile(file) {
 
   els.fileMeta.classList.remove("hidden");
   els.fileMeta.textContent = `${file.name} · ${formatBytes(file.size)}`;
-  const text = await file.text();
+  const text = await readFileText(file);
   els.filePreview.textContent = text.slice(0, 3000) || "文件内容为空。";
   els.filePreview.classList.toggle("empty", !text);
 }
@@ -285,6 +421,12 @@ els.refreshButton.addEventListener("click", () => {
 });
 
 els.bookList.addEventListener("click", (e) => {
+  const analyzeBtn = e.target.closest("[data-analyze-id]");
+  if (analyzeBtn) {
+    e.stopPropagation();
+    startAnalyze(analyzeBtn.dataset.analyzeId, analyzeBtn.dataset.monitor === "1");
+    return;
+  }
   const card = e.target.closest("[data-book-id]");
   if (!card) return;
   selectBook(card.dataset.bookId).catch((err) => {

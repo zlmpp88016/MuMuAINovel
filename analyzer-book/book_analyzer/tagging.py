@@ -41,7 +41,7 @@ class ParagraphTagger(Protocol):
 class TaggingResult:
     """标准化后的段落标签结果。
 
-    Args:
+    参数：
         tags: 面向检索和过滤的短标签，如冲突、伏笔、日常。
         characters: 片段中出现的核心角色名。
         scene_type: 场景类型，如打斗、会议、感情、升级。
@@ -86,7 +86,7 @@ class RuleBasedTagger:
     def __init__(self, fallback: RuleTagFallback) -> None:
         """保存规则提取器。
 
-        Args:
+        参数：
             fallback: 提供规则标签和角色抽取能力的对象。
         """
         self.fallback = fallback
@@ -94,10 +94,10 @@ class RuleBasedTagger:
     async def tag_chunk(self, chunk: Chunk) -> TaggingResult:
         """使用规则逻辑为 chunk 打标签。
 
-        Args:
+        参数：
             chunk: 待标注的文本片段。
 
-        Returns:
+        返回：
             ``source`` 为 ``rule`` 的标签结果。
         """
         logger.info("[规则标签] chunk %d-%d", chunk.chapter_no, chunk.chunk_index)
@@ -114,7 +114,7 @@ class LLMTagger:
     def __init__(self, ai_service: AIService, fallback: RuleTagFallback) -> None:
         """初始化小模型客户端和规则兜底。
 
-        Args:
+        参数：
             ai_service: 专用于 tagging 的 AIService 实例。
             fallback: 模型不可用或输出非法时使用的规则提取器。
         """
@@ -124,10 +124,10 @@ class LLMTagger:
     async def tag_chunk(self, chunk: Chunk) -> TaggingResult:
         """调用小模型为 chunk 生成结构化标签。
 
-        Args:
+        参数：
             chunk: 待标注的文本片段。
 
-        Returns:
+        返回：
             模型成功时返回 ``source=llm``，否则返回规则回退结果。
         """
         if not self.ai_service.is_available():
@@ -141,7 +141,7 @@ class LLMTagger:
                 prompt=self._prompt(chunk),
                 system_prompt=(
                     "你负责为中文网文段落打标签，仅返回紧凑的 JSON，"
-                    "不要 markdown，不要解释说明。"
+                    "不要 markdown，不要解释说明。如果有思考过程则思考结束后，于正文区输出最终的 JSON 结果，不要将最终的 JSON 写入思考区"
                 ),
             )
             payload = _parse_json_response(response["content"])
@@ -163,7 +163,7 @@ class LLMTagger:
             logger.exception("[LLM标签] chunk %d-%d 失败, 回退规则",
                              chunk.chapter_no, chunk.chunk_index)
             # tagging 是增强链路：模型超时、格式错误或限流时都回退规则标签。
-            # pass
+            # 保持异常向上抛出，由调用方决定是否继续降级。
             raise e
         return await self.fallback_tagger.tag_chunk(chunk)
 
@@ -191,15 +191,15 @@ def create_tagger(
 ) -> ParagraphTagger:
     """根据配置创建段落打标签器。
 
-    Args:
+    参数：
         settings: 当前服务配置。
         ai_service: tagging 专用小模型客户端，可为空。
         fallback: 规则回退提取器。
 
-    Returns:
+    返回：
         可直接用于分析流程的 ``ParagraphTagger``。
 
-    Raises:
+    抛出：
         RuntimeError: 配置强制使用 LLM，但没有可用模型。
     """
     backend = (settings.tagging_backend or "auto").lower()
