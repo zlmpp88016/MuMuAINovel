@@ -63,22 +63,25 @@ class MCPPluginResponse(BaseModel):
     description: Optional[str] = None
     plugin_type: str
     category: str
-    
+
     # HTTP类型字段
     server_url: Optional[str] = None
     headers: Optional[Dict[str, str]] = None
-    
+
     # Stdio类型字段
     command: Optional[str] = None
     args: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
-    
+
     # 状态字段
     enabled: bool
     status: str
     last_error: Optional[str] = None
     last_test_at: Optional[datetime] = None
-    
+
+    # 全局默认插件（user_id=__global__），只读展示
+    is_global: bool = False
+
     # 时间戳
     created_at: datetime
 

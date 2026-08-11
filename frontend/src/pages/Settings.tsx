@@ -1,828 +1,412 @@
-import { useState, useEffect } from 'react';
-import type { KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Form, Input, Button, Select, Slider, InputNumber, message, Space, Typography, Spin, Modal, Tooltip, Alert, Grid } from 'antd';
-import { SettingOutlined, SaveOutlined, DeleteOutlined, ReloadOutlined, ArrowLeftOutlined, InfoCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import {
+  Alert,
+  AutoComplete,
+  Button,
+  Card,
+  Col,
+  Empty,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Popconfirm,
+  Row,
+  Select,
+  Slider,
+  Space,
+  Spin,
+  Switch,
+  Table,
+  Tag,
+  Typography,
+  message,
+} from 'antd';
+import {
+  ArrowLeftOutlined,
+  CheckCircleOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SaveOutlined,
+  SettingOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons';
 import { settingsApi } from '../services/api';
-import type { SettingsUpdate } from '../types';
+import type {
+  LLMConfiguration,
+  LLMConfigurationConnectionRequest,
+  LLMConfigurationCreate,
+  LLMConfigurationUpdate,
+  LLMModuleBindingsResponse,
+} from '../types';
 
-const { Title, Paragraph } = Typography;
-const { Option } = Select;
-const { useBreakpoint } = Grid;
+const { Title, Text } = Typography;
+
+const providerOptions = [
+  { value: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
+  { value: 'anthropic', label: 'Anthropic', baseUrl: 'https://api.anthropic.com' },
+  { value: 'deepseek', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1' },
+  { value: 'siliconflow', label: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1' },
+  { value: 'moonshot', label: 'Moonshot', baseUrl: 'https://api.moonshot.cn/v1' },
+  { value: 'qwen', label: 'Qwen / DashScope', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  { value: 'custom', label: '自定义 OpenAI 兼容接口', baseUrl: '' },
+];
+
+interface ConfigFormValues {
+  name: string;
+  api_provider: string;
+  api_key?: string;
+  api_base_url?: string;
+  llm_model: string;
+  temperature: number;
+  max_tokens: number;
+  enabled: boolean;
+  is_default: boolean;
+}
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const screens = useBreakpoint();
-  const isMobile = !screens.md; // md断点是768px
-  const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [hasSettings, setHasSettings] = useState(false);
-  const [isDefaultSettings, setIsDefaultSettings] = useState(false);
-  const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string; description: string }>>([]);
-  const [fetchingModels, setFetchingModels] = useState(false);
-  const [modelsFetched, setModelsFetched] = useState(false);
-  const [testingApi, setTestingApi] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    success: boolean;
-    message: string;
-    response_time_ms?: number;
-    response_preview?: string;
-    error?: string;
-    error_type?: string;
-    suggestions?: string[];
-  } | null>(null);
-  const [showTestResult, setShowTestResult] = useState(false);
-  const [customModelInput, setCustomModelInput] = useState(''); // cache manual typing for custom values
+  const [form] = Form.useForm<ConfigFormValues>();
+  const [configs, setConfigs] = useState<LLMConfiguration[]>([]);
+  const [bindingData, setBindingData] = useState<LLMModuleBindingsResponse>({ modules: [], bindings: [] });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<LLMConfiguration | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; response_time_ms?: number; response_preview?: string; error?: string } | null>(null);
+  const [modelOptions, setModelOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [modelLoading, setModelLoading] = useState(false);
+  const [bindingLoading, setBindingLoading] = useState<string | null>(null);
 
-  const ensureModelOptionExists = (
-    options: Array<{ value: string; label: string; description: string }>,
-    modelName?: string | null
-  ) => {
-    if (!modelName) {
-      return options;
-    }
-    if (options.some(option => option.value === modelName)) {
-      return options;
-    }
-    return [{ value: modelName, label: modelName, description: '' }, ...options];
-  };
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    setInitialLoading(true);
-    try {
-      const settings = await settingsApi.getSettings();
-      form.setFieldsValue(settings);
-      setModelOptions(prev => ensureModelOptionExists(prev, settings.llm_model));
-      setCustomModelInput('');
-      
-      // 判断是否为默认设置（id='0'表示来自.env的默认配置）
-      if (settings.id === '0' || !settings.id) {
-        setIsDefaultSettings(true);
-        setHasSettings(false);
-      } else {
-        setIsDefaultSettings(false);
-        setHasSettings(true);
-      }
-    } catch (error: any) {
-      // 如果404表示还没有设置，使用默认值
-      if (error?.response?.status === 404) {
-        setHasSettings(false);
-        setIsDefaultSettings(true);
-        form.setFieldsValue({
-          api_provider: 'openai',
-          api_base_url: 'https://api.openai.com/v1',
-          llm_model: 'gpt-4',
-          temperature: 0.7,
-          max_tokens: 2000,
-        });
-        setModelOptions(prev => ensureModelOptionExists(prev, 'gpt-4'));
-        setCustomModelInput('');
-      } else {
-        message.error('加载设置失败');
-      }
-    } finally {
-      setInitialLoading(false);
-    }
-  };
-
-  const handleSave = async (values: SettingsUpdate) => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      await settingsApi.saveSettings(values);
-      message.success('设置已保存');
-      setHasSettings(true);
-      setIsDefaultSettings(false);
-    } catch (error) {
-      message.error('保存设置失败');
+      const [nextConfigs, nextBindings] = await Promise.all([
+        settingsApi.getLLMConfigurations(),
+        settingsApi.getLLMBindings(),
+      ]);
+      setConfigs(nextConfigs);
+      setBindingData(nextBindings);
+    } catch {
+      message.error('加载 LLM 配置失败');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReset = () => {
-    Modal.confirm({
-      title: '重置设置',
-      content: '确定要重置为默认值吗？',
-      okText: '确定',
-      cancelText: '取消',
-      onOk: () => {
-        form.setFieldsValue({
-          api_provider: 'openai',
-          api_key: '',
-          api_base_url: 'https://api.openai.com/v1',
-          llm_model: 'gpt-4',
-          temperature: 0.7,
-          max_tokens: 2000,
-        });
-        setModelOptions(prev => ensureModelOptionExists(prev, 'gpt-4'));
-        setCustomModelInput('');
-        message.info('已重置为默认值，请点击保存');
-      },
-    });
-  };
+  useEffect(() => {
+    void loadData();
+  }, []);
 
-  const handleDelete = () => {
-    Modal.confirm({
-      title: '删除设置',
-      content: '确定要删除所有设置吗？此操作不可恢复。',
-      okText: '确定',
-      cancelText: '取消',
-      okType: 'danger',
-      onOk: async () => {
-        setLoading(true);
-        try {
-          await settingsApi.deleteSettings();
-          message.success('设置已删除');
-          setHasSettings(false);
-          form.resetFields();
-          setModelOptions([]);
-          setCustomModelInput('');
-        } catch (error) {
-          message.error('删除设置失败');
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
-  };
+  const bindingByModule = useMemo(
+    () => new Map(bindingData.bindings.map(binding => [binding.module_key, binding.llm_config_id])),
+    [bindingData.bindings],
+  );
 
-  const apiProviders = [
-    { value: 'openai', label: 'OpenAI', defaultUrl: 'https://api.openai.com/v1' },
-    // { value: 'azure', label: 'Azure OpenAI', defaultUrl: 'https://YOUR-RESOURCE.openai.azure.com' },
-    { value: 'anthropic', label: 'Anthropic', defaultUrl: 'https://api.anthropic.com' },
-    // { value: 'custom', label: '自定义', defaultUrl: '' },
-  ];
-
-  const handleProviderChange = (value: string) => {
-    const provider = apiProviders.find(p => p.value === value);
-    if (provider && provider.defaultUrl) {
-      form.setFieldValue('api_base_url', provider.defaultUrl);
-    }
-    // 清空模型列表，需要重新获取
+  const openCreate = () => {
+    setEditing(null);
     setModelOptions([]);
-    setModelsFetched(false);
-    setCustomModelInput('');
-  };
-
-  const handleFetchModels = async (silent: boolean = false) => {
-    const apiKey = form.getFieldValue('api_key');
-    const apiBaseUrl = form.getFieldValue('api_base_url');
-    const provider = form.getFieldValue('api_provider');
-
-    if (!apiKey || !apiBaseUrl) {
-      if (!silent) {
-        message.warning('请先填写 API 密钥和 API 地址');
-      }
-      return;
-    }
-
-    setFetchingModels(true);
-    try {
-      const response = await settingsApi.getAvailableModels({
-        api_key: apiKey,
-        api_base_url: apiBaseUrl,
-        provider: provider || 'openai'
-      });
-      
-      const normalizedModels = response.models || [];
-      const currentModel = form.getFieldValue('llm_model');
-      const mergedModels = currentModel && !normalizedModels.some(option => option.value === currentModel)
-        ? [{ value: currentModel, label: currentModel, description: '' }, ...normalizedModels]
-        : normalizedModels;
-      setModelOptions(mergedModels);
-      setModelsFetched(true);
-      if (!silent) {
-        message.success(`成功获取 ${response.count || response.models.length} 个可用模型`);
-      }
-    } catch (error: any) {
-      const errorMsg = error?.response?.data?.detail || '获取模型列表失败';
-      if (!silent) {
-        message.error(errorMsg);
-      }
-      setModelOptions([]);
-      setModelsFetched(true); // 即使失败也标记为已尝试，避免重复请求
-    } finally {
-      setFetchingModels(false);
-    }
-  };
-
-  const handleModelSelectFocus = () => {
-    // 如果还没有获取过模型列表，自动获取
-    if (!modelsFetched && !fetchingModels) {
-      handleFetchModels(true); // silent模式，不显示成功消息
-    }
-  };
-
-  const commitCustomModelValue = () => {
-    const trimmedValue = customModelInput.trim();
-    if (!trimmedValue) {
-      return;
-    }
-    const currentValue = form.getFieldValue('llm_model');
-    if (currentValue !== trimmedValue) {
-      form.setFieldValue('llm_model', trimmedValue);
-    }
-    setModelOptions(prev => ensureModelOptionExists(prev, trimmedValue));
-    setCustomModelInput('');
-  };
-
-  const handleModelSearchChange = (value: string) => {
-    setCustomModelInput(value);
-  };
-
-  const handleModelInputBlur = () => {
-    if (!customModelInput.trim()) {
-      return;
-    }
-    commitCustomModelValue();
-  };
-
-  const handleModelInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      commitCustomModelValue();
-    }
-  };
-
-  const handleTestConnection = async () => {
-    const apiKey = form.getFieldValue('api_key');
-    const apiBaseUrl = form.getFieldValue('api_base_url');
-    const provider = form.getFieldValue('api_provider');
-    const modelName = form.getFieldValue('llm_model');
-
-    if (!apiKey || !apiBaseUrl || !provider || !modelName) {
-      message.warning('请先填写完整的配置信息');
-      return;
-    }
-
-    setTestingApi(true);
     setTestResult(null);
-    
+    form.setFieldsValue({
+      name: '',
+      api_provider: 'openai',
+      api_key: '',
+      api_base_url: 'https://api.openai.com/v1',
+      llm_model: 'gpt-4o-mini',
+      temperature: 0.7,
+      max_tokens: 2000,
+      enabled: true,
+      is_default: configs.length === 0,
+    });
+    setModalOpen(true);
+  };
+
+  const openEdit = (config: LLMConfiguration) => {
+    setEditing(config);
+    setModelOptions([{ value: config.llm_model, label: config.llm_model }]);
+    setTestResult(null);
+    form.setFieldsValue({
+      name: config.name,
+      api_provider: config.api_provider,
+      api_key: '',
+      api_base_url: config.api_base_url || '',
+      llm_model: config.llm_model,
+      temperature: config.temperature,
+      max_tokens: config.max_tokens,
+      enabled: config.enabled,
+      is_default: config.is_default,
+    });
+    setModalOpen(true);
+  };
+
+  const handleProviderChange = (provider: string) => {
+    const option = providerOptions.find(item => item.value === provider);
+    if (option?.baseUrl) {
+      form.setFieldValue('api_base_url', option.baseUrl);
+    }
+    setModelOptions([]);
+  };
+
+  const handleFetchModels = async () => {
+    const values = form.getFieldsValue();
+    const apiKey = values.api_key?.trim();
+    if (!editing && !apiKey) {
+      message.warning('请先填写 API Key');
+      return;
+    }
+    if (!values.api_base_url && !editing) {
+      message.warning('请先填写 API Base URL');
+      return;
+    }
+
+    setModelLoading(true);
     try {
-      const result = await settingsApi.testApiConnection({
-        api_key: apiKey,
-        api_base_url: apiBaseUrl,
-        provider: provider,
-        llm_model: modelName
-      });
-      
-      setTestResult(result);
-      setShowTestResult(true);
-      
-      if (result.success) {
-        message.success(`测试成功！响应时间: ${result.response_time_ms}ms`);
-      } else {
-        message.error('API 测试失败，请查看详细信息');
-      }
-    } catch (error: any) {
-      const errorMsg = error?.response?.data?.detail || '测试请求失败';
-      message.error(errorMsg);
-      setTestResult({
-        success: false,
-        message: '测试请求失败',
-        error: errorMsg,
-        error_type: 'RequestError',
-        suggestions: ['请检查网络连接', '请确认后端服务是否正常运行']
-      });
-      setShowTestResult(true);
+      const result = await settingsApi.getAvailableModels(
+        editing && !apiKey
+          ? { config_id: editing.id }
+          : {
+              api_key: apiKey,
+              api_base_url: values.api_base_url,
+              provider: values.api_provider,
+            },
+      );
+      setModelOptions(result.models.map(model => ({ value: model.value, label: model.label })));
+      message.success(`已获取 ${result.count || result.models.length} 个模型`);
+    } catch {
+      setModelOptions([]);
+      message.error('获取模型列表失败，请手动填写模型名称');
     } finally {
-      setTestingApi(false);
+      setModelLoading(false);
     }
   };
+
+  const handleTest = async () => {
+    try {
+      const values = await form.validateFields(['api_provider', 'api_key', 'api_base_url', 'llm_model']);
+      const request: LLMConfigurationConnectionRequest = {
+        api_provider: values.api_provider,
+        api_key: values.api_key || '',
+        api_base_url: values.api_base_url,
+        llm_model: values.llm_model,
+        temperature: values.temperature,
+        max_tokens: 100,
+      };
+      setTesting(true);
+      const result = editing && !values.api_key
+        ? await settingsApi.testSavedLLMConfiguration(editing.id)
+        : await settingsApi.testLLMConfiguration(request);
+      setTestResult(result);
+      if (result.success) {
+        message.success('API 连接测试成功');
+      }
+    } catch {
+      message.error('API 连接测试失败');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async (values: ConfigFormValues) => {
+    setSaving(true);
+    try {
+      if (editing) {
+        const payload: LLMConfigurationUpdate = {
+          name: values.name,
+          api_provider: values.api_provider,
+          api_base_url: values.api_base_url,
+          llm_model: values.llm_model,
+          temperature: values.temperature,
+          max_tokens: values.max_tokens,
+          enabled: values.enabled,
+          is_default: values.is_default,
+        };
+        if (values.api_key?.trim()) payload.api_key = values.api_key.trim();
+        await settingsApi.updateLLMConfiguration(editing.id, payload);
+        message.success('LLM 配置已更新');
+      } else {
+        const payload: LLMConfigurationCreate = {
+          ...values,
+          api_key: values.api_key?.trim() || '',
+          name: values.name.trim(),
+          llm_model: values.llm_model.trim(),
+        };
+        await settingsApi.createLLMConfiguration(payload);
+        message.success('LLM 配置已添加');
+      }
+      setModalOpen(false);
+      await loadData();
+    } catch {
+      message.error('保存 LLM 配置失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (config: LLMConfiguration) => {
+    try {
+      await settingsApi.deleteLLMConfiguration(config.id);
+      message.success('LLM 配置已删除');
+      await loadData();
+    } catch {
+      message.error('删除 LLM 配置失败');
+    }
+  };
+
+  const handleBindingChange = async (moduleKey: string, configId?: string) => {
+    setBindingLoading(moduleKey);
+    try {
+      await settingsApi.updateLLMBindings({ [moduleKey]: configId || null });
+      setBindingData(await settingsApi.getLLMBindings());
+      message.success('模块模型已更新');
+    } catch {
+      message.error('模块模型更新失败');
+    } finally {
+      setBindingLoading(null);
+    }
+  };
+
+  const enabledConfigs = configs.filter(config => config.enabled && config.api_key_configured);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: isMobile ? '16px 12px' : '40px 24px'
-    }}>
-      <div style={{
-        maxWidth: isMobile ? '100%' : 800,
-        margin: '0 auto'
-      }}>
-        <Card
-          variant="borderless"
-          style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: isMobile ? 12 : 16,
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          }}
-          styles={{
-            body: {
-              padding: isMobile ? '16px' : '24px'
-            }
-          }}
-        >
-          <Space direction="vertical" size={isMobile ? 'middle' : 'large'} style={{ width: '100%' }}>
-            {/* 标题栏 */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '8px'
-            }}>
-              <Space size={isMobile ? 'small' : 'middle'}>
-                <Button
-                  icon={<ArrowLeftOutlined />}
-                  onClick={() => navigate('/')}
-                  type="text"
-                  size={isMobile ? 'middle' : 'large'}
-                />
-                <Title
-                  level={isMobile ? 4 : 2}
-                  style={{
-                    margin: 0,
-                    fontSize: isMobile ? '18px' : undefined
-                  }}
-                >
-                  <SettingOutlined style={{ marginRight: 8, color: '#667eea' }} />
-                  {isMobile ? 'API 设置' : 'AI API 设置'}
-                </Title>
-              </Space>
-            </div>
-
-            <Paragraph
-              type="secondary"
-              style={{
-                marginBottom: 0,
-                fontSize: isMobile ? '13px' : '14px',
-                lineHeight: isMobile ? '1.5' : '1.6'
-              }}
-            >
-              配置你的AI API接口参数，这些设置将用于小说生成、角色创建等AI功能。
-            </Paragraph>
-
-            {/* 默认配置提示 */}
-            {isDefaultSettings && (
-              <Alert
-                message="使用 .env 文件中的默认配置"
-                description={
-                  <div style={{ fontSize: isMobile ? '12px' : '14px' }}>
-                    <p style={{ margin: '8px 0' }}>
-                      当前显示的是从服务器 <code>.env</code> 文件读取的默认配置。
-                    </p>
-                    <p style={{ margin: '8px 0 0 0' }}>
-                      点击"保存设置"后，配置将保存到数据库并同步更新到 <code>.env</code> 文件。
-                    </p>
-                  </div>
-                }
-                type="info"
-                showIcon
-                style={{ marginBottom: isMobile ? 12 : 16 }}
-              />
-            )}
-
-            {/* 已保存配置提示 */}
-            {hasSettings && !isDefaultSettings && (
-              <Alert
-                message="使用已保存的个人配置"
-                type="success"
-                showIcon
-                style={{ marginBottom: isMobile ? 12 : 16 }}
-              />
-            )}
-
-            {/* 表单 */}
-            <Spin spinning={initialLoading}>
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={handleSave}
-                autoComplete="off"
-              >
-                <Form.Item
-                  label={
-                    <Space size={4}>
-                      <span>API 提供商</span>
-                      <Tooltip title="选择你的AI服务提供商">
-                        <InfoCircleOutlined style={{ color: '#8c8c8c', fontSize: isMobile ? '12px' : '14px' }} />
-                      </Tooltip>
-                    </Space>
-                  }
-                  name="api_provider"
-                  rules={[{ required: true, message: '请选择API提供商' }]}
-                >
-                  <Select size={isMobile ? 'middle' : 'large'} onChange={handleProviderChange}>
-                    {apiProviders.map(provider => (
-                      <Option key={provider.value} value={provider.value}>
-                        {provider.label}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-
-                <Form.Item
-                  label={
-                    <Space size={4}>
-                      <span>API 密钥</span>
-                      <Tooltip title="你的API密钥，将加密存储">
-                        <InfoCircleOutlined style={{ color: '#8c8c8c', fontSize: isMobile ? '12px' : '14px' }} />
-                      </Tooltip>
-                    </Space>
-                  }
-                  name="api_key"
-                  rules={[{ required: true, message: '请输入API密钥' }]}
-                >
-                  <Input.Password
-                    size={isMobile ? 'middle' : 'large'}
-                    placeholder="sk-..."
-                    autoComplete="new-password"
-                  />
-                </Form.Item>
-
-                <Form.Item
-                  label={
-                    <Space size={4}>
-                      <span>API 地址</span>
-                      <Tooltip title="API的基础URL地址">
-                        <InfoCircleOutlined style={{ color: '#8c8c8c', fontSize: isMobile ? '12px' : '14px' }} />
-                      </Tooltip>
-                    </Space>
-                  }
-                  name="api_base_url"
-                  rules={[
-                    { required: true, message: '请输入API地址' },
-                    { type: 'url', message: '请输入有效的URL' }
-                  ]}
-                >
-                  <Input
-                    size={isMobile ? 'middle' : 'large'}
-                    placeholder="https://api.openai.com/v1"
-                  />
-                </Form.Item>
-
-                <Form.Item
-                  label={
-                    <Space size={4}>
-                      <span>模型名称</span>
-                      <Tooltip title="AI模型的名称，如 gpt-4, gpt-3.5-turbo">
-                        <InfoCircleOutlined style={{ color: '#8c8c8c', fontSize: isMobile ? '12px' : '14px' }} />
-                      </Tooltip>
-                    </Space>
-                  }
-                  name="llm_model"
-                  rules={[{ required: true, message: '请输入或选择模型名称' }]}
-                >
-                  <Select
-                    size={isMobile ? 'middle' : 'large'}
-                    showSearch
-                    placeholder={isMobile ? "选择模型" : "输入模型名称或点击获取"}
-                    optionFilterProp="label"
-                    onSearch={handleModelSearchChange}
-                    onBlur={handleModelInputBlur}
-                    onInputKeyDown={handleModelInputKeyDown}
-                    onChange={(value: string) => {
-                      setCustomModelInput('');
-                      form.setFieldValue('llm_model', value);
-                    }}
-                    loading={fetchingModels}
-                    onFocus={handleModelSelectFocus}
-                    filterOption={(input, option) =>
-                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
-                      (option?.description ?? '').toLowerCase().includes(input.toLowerCase())
-                    }
-                    dropdownRender={(menu) => (
-                      <>
-                        {menu}
-                        {fetchingModels && (
-                          <div style={{ padding: '8px 12px', color: '#8c8c8c', textAlign: 'center', fontSize: isMobile ? '12px' : '14px' }}>
-                            <Spin size="small" /> 正在获取模型列表...
-                          </div>
-                        )}
-                        {!fetchingModels && modelOptions.length === 0 && modelsFetched && (
-                          <div style={{ padding: '8px 12px', color: '#ff4d4f', textAlign: 'center', fontSize: isMobile ? '12px' : '14px' }}>
-                            未能获取到模型列表，请检查 API 配置
-                          </div>
-                        )}
-                        {!fetchingModels && modelOptions.length === 0 && !modelsFetched && (
-                          <div style={{ padding: '8px 12px', color: '#8c8c8c', textAlign: 'center', fontSize: isMobile ? '12px' : '14px' }}>
-                            点击输入框自动获取模型列表
-                          </div>
-                        )}
-                      </>
-                    )}
-                    notFoundContent={
-                      fetchingModels ? (
-                        <div style={{ padding: '8px 12px', textAlign: 'center', fontSize: isMobile ? '12px' : '14px' }}>
-                          <Spin size="small" /> 加载中...
-                        </div>
-                      ) : (
-                        <div style={{ padding: '8px 12px', color: '#8c8c8c', textAlign: 'center', fontSize: isMobile ? '12px' : '14px' }}>
-                          未找到匹配的模型
-                        </div>
-                      )
-                    }
-                    suffixIcon={
-                      !isMobile ? (
-                        <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!fetchingModels) {
-                              setModelsFetched(false);
-                              handleFetchModels(false);
-                            }
-                          }}
-                          style={{
-                            cursor: fetchingModels ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '0 4px',
-                            height: '100%',
-                            marginRight: -8
-                          }}
-                          title="重新获取模型列表"
-                        >
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<ReloadOutlined />}
-                            loading={fetchingModels}
-                            style={{ pointerEvents: 'none' }}
-                          >
-                            刷新
-                          </Button>
-                        </div>
-                      ) : undefined
-                    }
-                    options={modelOptions.map(model => ({
-                      value: model.value,
-                      label: model.label,
-                      description: model.description
-                    }))}
-                    optionRender={(option) => (
-                      <div>
-                        <div style={{ fontWeight: 500, fontSize: isMobile ? '13px' : '14px' }}>{option.data.label}</div>
-                        {option.data.description && (
-                          <div style={{ fontSize: isMobile ? '11px' : '12px', color: '#8c8c8c', marginTop: '2px' }}>
-                            {option.data.description}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  />
-                </Form.Item>
-
-                <Form.Item
-                  label={
-                    <Space size={4}>
-                      <span>温度参数</span>
-                      <Tooltip title="控制输出的随机性，值越高越随机（0.0-2.0）">
-                        <InfoCircleOutlined style={{ color: '#8c8c8c', fontSize: isMobile ? '12px' : '14px' }} />
-                      </Tooltip>
-                    </Space>
-                  }
-                  name="temperature"
-                >
-                  <Slider
-                    min={0}
-                    max={2}
-                    step={0.1}
-                    marks={{
-                      0: { style: { fontSize: isMobile ? '11px' : '12px' }, label: '0.0' },
-                      0.7: { style: { fontSize: isMobile ? '11px' : '12px' }, label: '0.7' },
-                      1: { style: { fontSize: isMobile ? '11px' : '12px' }, label: '1.0' },
-                      2: { style: { fontSize: isMobile ? '11px' : '12px' }, label: '2.0' }
-                    }}
-                  />
-                </Form.Item>
-
-                <Form.Item
-                  label={
-                    <Space size={4}>
-                      <span>最大 Token 数</span>
-                      <Tooltip title="单次请求的最大token数量">
-                        <InfoCircleOutlined style={{ color: '#8c8c8c', fontSize: isMobile ? '12px' : '14px' }} />
-                      </Tooltip>
-                    </Space>
-                  }
-                  name="max_tokens"
-                  rules={[
-                    { required: true, message: '请输入最大token数' },
-                    { type: 'number', min: 1, message: '请输入大于0的数字' }
-                  ]}
-                >
-                  <InputNumber
-                    size={isMobile ? 'middle' : 'large'}
-                    style={{ width: '100%' }}
-                    min={1}
-                    placeholder="2000"
-                  />
-                </Form.Item>
-
-                {/* 测试结果展示 */}
-                {showTestResult && testResult && (
-                  <Alert
-                    message={
-                      <Space>
-                        {testResult.success ? (
-                          <CheckCircleOutlined style={{ color: '#52c41a', fontSize: isMobile ? '16px' : '18px' }} />
-                        ) : (
-                          <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: isMobile ? '16px' : '18px' }} />
-                        )}
-                        <span style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: 500 }}>
-                          {testResult.message}
-                        </span>
-                      </Space>
-                    }
-                    description={
-                      <div style={{ marginTop: 8 }}>
-                        {testResult.success ? (
-                          <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                            {testResult.response_time_ms && (
-                              <div style={{ fontSize: isMobile ? '12px' : '14px' }}>
-                                ⚡ 响应时间: <strong>{testResult.response_time_ms} ms</strong>
-                              </div>
-                            )}
-                            {testResult.response_preview && (
-                              <div style={{
-                                fontSize: isMobile ? '12px' : '13px',
-                                padding: '8px 12px',
-                                background: '#f6ffed',
-                                borderRadius: '4px',
-                                border: '1px solid #b7eb8f',
-                                marginTop: '8px'
-                              }}>
-                                <div style={{ marginBottom: '4px', fontWeight: 500 }}>AI 响应预览:</div>
-                                <div style={{ color: '#595959' }}>{testResult.response_preview}</div>
-                              </div>
-                            )}
-                            <div style={{ color: '#52c41a', fontSize: isMobile ? '12px' : '13px', marginTop: '4px' }}>
-                              ✓ API 配置正确，可以正常使用
-                            </div>
-                          </Space>
-                        ) : (
-                          <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                            {testResult.error && (
-                              <div style={{
-                                fontSize: isMobile ? '12px' : '13px',
-                                padding: '8px 12px',
-                                background: '#fff2e8',
-                                borderRadius: '4px',
-                                border: '1px solid #ffbb96',
-                                color: '#d4380d'
-                              }}>
-                                <strong>错误信息:</strong> {testResult.error}
-                              </div>
-                            )}
-                            {testResult.error_type && (
-                              <div style={{ fontSize: isMobile ? '11px' : '12px', color: '#8c8c8c' }}>
-                                错误类型: {testResult.error_type}
-                              </div>
-                            )}
-                            {testResult.suggestions && testResult.suggestions.length > 0 && (
-                              <div style={{ marginTop: '8px' }}>
-                                <div style={{ fontSize: isMobile ? '12px' : '13px', fontWeight: 500, marginBottom: '4px' }}>
-                                  💡 解决建议:
-                                </div>
-                                <ul style={{
-                                  margin: 0,
-                                  paddingLeft: isMobile ? '16px' : '20px',
-                                  fontSize: isMobile ? '12px' : '13px',
-                                  color: '#595959'
-                                }}>
-                                  {testResult.suggestions.map((suggestion, index) => (
-                                    <li key={index} style={{ marginBottom: '4px' }}>{suggestion}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </Space>
-                        )}
-                      </div>
-                    }
-                    type={testResult.success ? 'success' : 'error'}
-                    closable
-                    onClose={() => setShowTestResult(false)}
-                    style={{ marginBottom: isMobile ? 16 : 24 }}
-                  />
-                )}
-
-                {/* 操作按钮 */}
-                <Form.Item style={{ marginBottom: 0, marginTop: isMobile ? 24 : 32 }}>
-                  {isMobile ? (
-                    // 移动端：垂直堆叠布局
-                    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                      <Button
-                        type="primary"
-                        size="large"
-                        icon={<SaveOutlined />}
-                        htmlType="submit"
-                        loading={loading}
-                        block
-                        style={{
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          border: 'none',
-                          height: '44px'
-                        }}
-                      >
-                        保存设置
-                      </Button>
-                      <Space size="middle" style={{ width: '100%' }}>
-                        <Button
-                          size="large"
-                          icon={<ReloadOutlined />}
-                          onClick={handleReset}
-                          style={{ flex: 1, height: '44px' }}
-                        >
-                          重置
-                        </Button>
-                        {hasSettings && (
-                          <Button
-                            danger
-                            size="large"
-                            icon={<DeleteOutlined />}
-                            onClick={handleDelete}
-                            loading={loading}
-                            style={{ flex: 1, height: '44px' }}
-                          >
-                            删除
-                          </Button>
-                        )}
-                      </Space>
-                    </Space>
-                  ) : (
-                    // 桌面端：删除在左边，测试、重置和保存在右边
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '16px',
-                      flexWrap: 'wrap'
-                    }}>
-                      {/* 左侧：删除按钮 */}
-                      {hasSettings ? (
-                        <Button
-                          danger
-                          size="large"
-                          icon={<DeleteOutlined />}
-                          onClick={handleDelete}
-                          loading={loading}
-                          style={{
-                            minWidth: '100px'
-                          }}
-                        >
-                          删除配置
-                        </Button>
-                      ) : (
-                        <div /> // 占位符，保持右侧按钮位置
-                      )}
-                      
-                      {/* 右侧：测试、重置和保存按钮组 */}
-                      <Space size="middle">
-                        <Button
-                          size="large"
-                          icon={<ThunderboltOutlined />}
-                          onClick={handleTestConnection}
-                          loading={testingApi}
-                          style={{
-                            borderColor: '#52c41a',
-                            color: '#52c41a',
-                            fontWeight: 500,
-                            minWidth: '100px'
-                          }}
-                        >
-                          {testingApi ? '测试中...' : '测试'}
-                        </Button>
-                        <Button
-                          size="large"
-                          icon={<ReloadOutlined />}
-                          onClick={handleReset}
-                          style={{
-                            minWidth: '100px'
-                          }}
-                        >
-                          重置
-                        </Button>
-                        <Button
-                          type="primary"
-                          size="large"
-                          icon={<SaveOutlined />}
-                          htmlType="submit"
-                          loading={loading}
-                          style={{
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            border: 'none',
-                            minWidth: '120px',
-                            fontWeight: 500
-                          }}
-                        >
-                          保存
-                        </Button>
-                      </Space>
-                    </div>
-                  )}
-                </Form.Item>
-              </Form>
-            </Spin>
+    <div style={{ minHeight: '100%', background: '#f5f7fa', padding: 24 }}>
+      <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+        <Space direction="vertical" size={20} style={{ width: '100%' }}>
+          <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
+            <Space>
+              <Button icon={<ArrowLeftOutlined />} type="text" onClick={() => navigate('/')} aria-label="返回首页" />
+              <Title level={2} style={{ margin: 0 }}><SettingOutlined /> AI 配置中心</Title>
+            </Space>
+            <Button icon={<ReloadOutlined />} onClick={() => void loadData()} loading={loading}>刷新</Button>
           </Space>
-        </Card>
+
+          <Alert
+            type="info"
+            showIcon
+            message="多配置与模块路由"
+            description="新增的配置可分别绑定到世界观、大纲、章节、角色、组织和润色模块。生成请求也可以临时覆盖模块默认配置；未选择时继续使用旧 Settings 作为兜底。"
+          />
+
+          <Card
+            title="LLM API 配置"
+            extra={<Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增配置</Button>}
+          >
+            <Spin spinning={loading}>
+              {configs.length === 0 ? (
+                <Empty description="还没有 LLM 配置" />
+              ) : (
+                <Table
+                  rowKey="id"
+                  pagination={false}
+                  dataSource={configs}
+                  columns={[
+                    { title: '名称', dataIndex: 'name', key: 'name', render: (value: string, config: LLMConfiguration) => <Space>{value}{config.is_default && <Tag color="blue">默认</Tag>}</Space> },
+                    { title: '提供商 / 模型', key: 'model', render: (_: unknown, config: LLMConfiguration) => <div><div>{config.api_provider}</div><Text type="secondary">{config.llm_model}</Text></div> },
+                    { title: 'API Key', dataIndex: 'api_key_masked', key: 'api_key', render: (value: string) => value || <Text type="danger">未配置</Text> },
+                    { title: '状态', dataIndex: 'enabled', key: 'enabled', render: (enabled: boolean) => enabled ? <Tag color="success">启用</Tag> : <Tag>停用</Tag> },
+                    { title: '操作', key: 'actions', width: 150, render: (_: unknown, config: LLMConfiguration) => <Space><Button icon={<EditOutlined />} onClick={() => openEdit(config)} aria-label={`编辑 ${config.name}`} /><Popconfirm title="删除此 LLM 配置？" description="已绑定的模块会自动解除绑定。" onConfirm={() => void handleDelete(config)}><Button danger icon={<DeleteOutlined />} aria-label={`删除 ${config.name}`} /></Popconfirm></Space> },
+                  ]}
+                />
+              )}
+            </Spin>
+          </Card>
+
+          <Card title="模块默认模型" extra={<Text type="secondary">清空后按默认配置或旧 Settings 解析</Text>}>
+            {bindingData.modules.length === 0 ? (
+              <Empty description="暂无模块信息" />
+            ) : (
+              <Row gutter={[16, 16]}>
+                {bindingData.modules.map(module => (
+                  <Col xs={24} sm={12} lg={8} key={module.key}>
+                    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                      <Text strong>{module.label}</Text>
+                      <Select
+                        allowClear
+                        loading={bindingLoading === module.key}
+                        value={bindingByModule.get(module.key)}
+                        placeholder="不绑定，使用系统默认"
+                        options={enabledConfigs.map(config => ({ value: config.id, label: `${config.name} · ${config.llm_model}` }))}
+                        onChange={(value) => void handleBindingChange(module.key, value)}
+                        style={{ width: '100%' }}
+                        notFoundContent="暂无启用配置"
+                      />
+                    </Space>
+                  </Col>
+                ))}
+              </Row>
+            )}
+          </Card>
+        </Space>
       </div>
+
+      <Modal
+        open={modalOpen}
+        title={editing ? '编辑 LLM 配置' : '新增 LLM 配置'}
+        width={720}
+        destroyOnClose
+        onCancel={() => setModalOpen(false)}
+        footer={null}
+      >
+        <Form form={form} layout="vertical" onFinish={handleSave} style={{ marginTop: 20 }}>
+          <Row gutter={16}>
+            <Col xs={24} md={12}><Form.Item name="name" label="配置名称" rules={[{ required: true, message: '请输入配置名称' }]}><Input placeholder="例如：主力写作模型" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="api_provider" label="提供商" rules={[{ required: true }]}><Select options={providerOptions} onChange={handleProviderChange} /></Form.Item></Col>
+          </Row>
+          <Form.Item name="api_key" label="API Key" rules={editing ? [] : [{ required: true, message: '请输入 API Key' }]} extra={editing ? '留空表示保留现有 Key；服务端不会返回明文 Key。' : 'Key 仅用于服务端调用和连接测试。'}><Input.Password autoComplete="new-password" placeholder={editing ? '留空保持不变' : '输入 API Key'} /></Form.Item>
+          <Form.Item name="api_base_url" label="API Base URL" rules={[{ required: true, message: '请输入 API Base URL' }]}><Input placeholder="https://api.openai.com/v1" /></Form.Item>
+          <Form.Item label="模型" required>
+            <Space.Compact style={{ width: '100%' }}>
+              <Form.Item name="llm_model" noStyle rules={[{ required: true, message: '请输入模型名称' }]}>
+                <AutoComplete
+                  style={{ width: '100%' }}
+                  options={modelOptions}
+                  placeholder="输入模型名称"
+                  onSelect={(value) => form.setFieldValue('llm_model', value)}
+                />
+              </Form.Item>
+              <Button icon={<ReloadOutlined />} onClick={() => void handleFetchModels()} loading={modelLoading}>获取模型</Button>
+            </Space.Compact>
+          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} md={12}><Form.Item name="temperature" label="Temperature"><Slider min={0} max={2} step={0.1} marks={{ 0: '0', 1: '1', 2: '2' }} /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="max_tokens" label="最大 Tokens" rules={[{ required: true }]}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item></Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="enabled"
+                label="启用"
+                valuePropName="checked"
+                tooltip="关闭后该配置立即失效：无法绑定到模块，也不会作为默认配置被选中。配置本身不会删除，可随时重新启用。"
+                extra="关闭后配置立即失效"
+              >
+                <Switch />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="is_default"
+                label="用户默认"
+                valuePropName="checked"
+                tooltip="生成请求既未临时指定 LLM 配置、也未给模块绑定配置时，使用这条默认配置兜底。遵循「请求指定 > 模块绑定 > 用户默认」的优先级。同一用户仅能有一个默认。"
+                extra="兜底模型，未指定模块时使用"
+              >
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {testResult && <Alert type={testResult.success ? 'success' : 'error'} showIcon icon={testResult.success ? <CheckCircleOutlined /> : undefined} message={testResult.message} description={testResult.success ? `${testResult.response_time_ms || 0} ms${testResult.response_preview ? ` · ${testResult.response_preview}` : ''}` : testResult.error} closable onClose={() => setTestResult(null)} style={{ marginBottom: 16 }} />}
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button icon={<ThunderboltOutlined />} onClick={() => void handleTest()} loading={testing}>测试连接</Button>
+            <Button onClick={() => setModalOpen(false)}>取消</Button>
+            <Button type="primary" icon={<SaveOutlined />} htmlType="submit" loading={saving}>保存配置</Button>
+          </Space>
+        </Form>
+      </Modal>
     </div>
   );
 }

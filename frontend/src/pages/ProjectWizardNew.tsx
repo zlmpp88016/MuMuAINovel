@@ -11,6 +11,7 @@ import {
 import { wizardStreamApi } from '../services/api';
 import type { WizardBasicInfo, ApiError } from '../types';
 import { SSELoadingOverlay } from '../components/SSELoadingOverlay';
+import LLMConfigSelector from '../components/LLMConfigSelector';
 
 const { TextArea } = Input;
 const { Title, Paragraph, Text } = Typography;
@@ -70,6 +71,7 @@ export default function ProjectWizardNew() {
           target_words: values.target_words,
           chapter_count: values.chapter_count || 30,
           character_count: values.character_count || 5,
+          llm_config_id: values.world_llm_config_id,
         },
         {
           onProgress: (msg, prog) => {
@@ -113,6 +115,7 @@ export default function ProjectWizardNew() {
           },
           theme: values.theme,
           genre: Array.isArray(values.genre) ? values.genre.join('、') : values.genre,
+          llm_config_id: values.character_llm_config_id,
         },
         {
           onProgress: (msg, prog) => {
@@ -143,6 +146,7 @@ export default function ProjectWizardNew() {
           chapter_count: 5, // 开局5章
           narrative_perspective: values.narrative_perspective,
           target_words: values.target_words,
+          llm_config_id: values.outline_llm_config_id,
         },
         {
           onProgress: (msg, prog) => {
@@ -309,6 +313,26 @@ export default function ProjectWizardNew() {
             placeholder="整部小说的目标字数"
           />
         </Form.Item>
+
+        <Card size="small" title="本次生成使用的模型（可选）" style={{ marginBottom: 24 }}>
+          <Row gutter={[16, 12]}>
+            <Col xs={24} md={8}>
+              <Form.Item label="世界观" name="world_llm_config_id" style={{ marginBottom: 0 }}>
+                <LLMConfigSelector />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item label="角色" name="character_llm_config_id" style={{ marginBottom: 0 }}>
+                <LLMConfigSelector />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item label="开局大纲" name="outline_llm_config_id" style={{ marginBottom: 0 }}>
+                <LLMConfigSelector />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
 
         <Form.Item>
           <Space direction="vertical" style={{ width: '100%' }} size={12}>

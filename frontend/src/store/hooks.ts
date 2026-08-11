@@ -306,7 +306,8 @@ export function useChapterSync() {
     styleId?: number,
     targetWordCount?: number,
     onProgressUpdate?: (message: string, progress: number) => void,
-    oneTimePrompt?: string
+    oneTimePrompt?: string,
+    llmConfigId?: string
   ) => {
     try {
       // 使用fetch处理流式响应
@@ -319,6 +320,7 @@ export function useChapterSync() {
           styleId,
           targetWordCount,
           oneTimePrompt,
+          llmConfigId,
         })),
       });
 

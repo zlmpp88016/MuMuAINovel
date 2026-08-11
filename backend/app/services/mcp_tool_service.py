@@ -14,6 +14,7 @@ from app.models.mcp_plugin import MCPPlugin
 from app.mcp.registry import mcp_registry
 from app.mcp.config import mcp_config
 from app.logger import get_logger
+from app.utils.json_schema import normalize_json_schema_for_function_calling
 
 logger = get_logger(__name__)
 
@@ -254,11 +255,11 @@ class MCPToolService:
                 "function": {
                     "name": f"{plugin_name}_{tool['name']}",  # 加插件前缀避免冲突
                     "description": tool.get("description", ""),
-                    "parameters": tool.get("inputSchema", {
+                    "parameters": normalize_json_schema_for_function_calling(tool.get("inputSchema", {
                         "type": "object",
                         "properties": {},
                         "required": []
-                    })
+                    }))
                 }
             }
             formatted_tools.append(formatted_tool)

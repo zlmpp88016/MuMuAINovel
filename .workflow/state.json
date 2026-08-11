@@ -1,7 +1,7 @@
 {
-  "version": "2.0",
   "project_name": "MuMuAINovel",
   "status": "active",
+  "version": "2.0",
   "current_milestone": null,
   "current_task_id": null,
   "milestones": [],
@@ -13,7 +13,7 @@
   },
   "transition_history": [],
   "milestone_history": [],
-  "last_updated": "2026-07-23T17:44:36+08:00",
+  "last_updated": "2026-08-11T00:28:59+08:00",
   "sessions": [
     {
       "session_id": "maestro-onetime-chapter-prompt-20260723-094319",
@@ -22,7 +22,39 @@
       "depends_on": [],
       "roadmap_artifact_id": null,
       "seed_ref": null
+    },
+    {
+      "session_id": "20260727-maestro-mcp-tag-solution-20260727-012941",
+      "intent": "探讨 backend 写章节时 MCP 向量库标签匹配失败的整改方案",
+      "status": "sealed",
+      "depends_on": [],
+      "roadmap_artifact_id": null,
+      "seed_ref": null
+    },
+    {
+      "session_id": "20260729-maestro-llm-config-routing-20260729-032830",
+      "intent": "支持多个 LLM API 配置并让小说模块自由选择模型，前端由 Claude 实现",
+      "status": "sealed",
+      "depends_on": [],
+      "roadmap_artifact_id": null,
+      "seed_ref": null
+    },
+    {
+      "session_id": "20260809-analyze-module-default-model",
+      "intent": "检查模块默认模型配置是否在小说各步骤中正确使用不同LLM API",
+      "status": "sealed",
+      "depends_on": [],
+      "roadmap_artifact_id": null,
+      "seed_ref": null
+    },
+    {
+      "session_id": "20260810-docs-0810-review-20260810-150205",
+      "intent": "查看 docs/0810 文档，分析可行性与不足，补充简洁、清晰、可维护的分层设计见解，不做过度设计",
+      "status": "running",
+      "depends_on": [],
+      "roadmap_artifact_id": null,
+      "seed_ref": null
     }
   ],
-  "active_session_id": "maestro-onetime-chapter-prompt-20260723-094319"
+  "active_session_id": "20260810-docs-0810-review-20260810-150205"
 }

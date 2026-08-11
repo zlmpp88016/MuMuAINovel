@@ -36,6 +36,67 @@ export interface SettingsUpdate {
   preferences?: string;
 }
 
+export interface LLMConfiguration {
+  id: string;
+  user_id: string;
+  name: string;
+  api_provider: string;
+  api_base_url?: string | null;
+  llm_model: string;
+  temperature: number;
+  max_tokens: number;
+  enabled: boolean;
+  is_default: boolean;
+  api_key_masked: string;
+  api_key_configured: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LLMConfigurationCreate {
+  name: string;
+  api_provider: string;
+  api_key: string;
+  api_base_url?: string;
+  llm_model: string;
+  temperature?: number;
+  max_tokens?: number;
+  enabled?: boolean;
+  is_default?: boolean;
+}
+
+export interface LLMConfigurationUpdate {
+  name?: string;
+  api_provider?: string;
+  api_key?: string;
+  api_base_url?: string;
+  llm_model?: string;
+  temperature?: number;
+  max_tokens?: number;
+  enabled?: boolean;
+  is_default?: boolean;
+}
+
+export interface LLMModuleBinding {
+  module_key: string;
+  llm_config_id: string;
+  config: LLMConfiguration;
+}
+
+export interface LLMModuleBindingsResponse {
+  modules: Array<{ key: string; label: string }>;
+  bindings: LLMModuleBinding[];
+}
+
+export interface LLMConfigurationConnectionRequest {
+  api_provider: string;
+  api_key: string;
+  api_base_url?: string;
+  llm_model: string;
+  temperature?: number;
+  max_tokens?: number;
+}
+
 // LinuxDO 授权 URL 响应
 export interface AuthUrlResponse {
   auth_url: string;
@@ -239,6 +300,7 @@ export interface ChapterGenerateRequest {
   style_id?: number;
   target_word_count?: number;
   one_time_prompt?: string;
+  llm_config_id?: string;
 }
 
 // 章节生成检查响应
@@ -268,6 +330,7 @@ export interface GenerateOutlineRequest {
   requirements?: string;
   provider?: string;
   model?: string;
+  llm_config_id?: string;
   // 续写功能新增字段
   mode?: 'auto' | 'new' | 'continue';
   story_direction?: string;
@@ -293,11 +356,13 @@ export interface GenerateCharacterRequest {
   requirements?: string;
   provider?: string;
   model?: string;
+  llm_config_id?: string;
 }
 
 export interface PolishTextRequest {
   text: string;
   style?: string;
+  llm_config_id?: string;
 }
 
 // 向导API响应类型
@@ -377,6 +442,9 @@ export interface WizardBasicInfo {
   narrative_perspective: string;
   character_count?: number;
   target_words?: number;
+  world_llm_config_id?: string;
+  character_llm_config_id?: string;
+  outline_llm_config_id?: string;
 }
 
 // API 错误响应类型
@@ -550,7 +618,10 @@ export interface MCPPlugin {
   status: 'active' | 'inactive' | 'error';
   last_error?: string;
   last_test_at?: string;
-  
+
+  /** 全局默认插件（只读展示） */
+  is_global?: boolean;
+
   // 时间戳
   created_at: string;
 }

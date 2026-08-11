@@ -30,6 +30,7 @@ class ChapterRegenerateRequest(BaseModel):
     # 生成参数
     style_id: Optional[int] = Field(None, description="写作风格ID")
     target_word_count: int = Field(3000, description="目标字数", ge=500, le=10000)
+    llm_config_id: Optional[str] = Field(None, description="LLM配置ID")
     focus_areas: List[str] = Field(default_factory=list, description="重点优化方向")
     
     # 版本管理

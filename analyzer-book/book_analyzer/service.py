@@ -15,6 +15,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import time
 from typing import Any, Callable
 
 from sqlalchemy import func, select
@@ -618,6 +619,72 @@ class BookAnalysisService:
             "sample_count": len(profiles),
             "profiles": profiles,
         }
+
+    def get_reference_tag_catalog(self, genre: str | None = None) -> dict[str, Any]:
+        """汇总已完成语料的可用参考标签，不读取向量索引或片段正文。"""
+        started_at = time.perf_counter()
+        with self._session() as session:
+            # 关系型元数据是标签的权威来源；Chroma 中的 JSON tags 仅用于召回后的过滤。
+            rows = list(
+                session.execute(
+                    select(Book, BookChunk)
+                    .join(BookChunk, BookChunk.book_id == Book.id)
+                    .where(Book.status == "completed")
+                ).all()
+            )
+
+        scene_types: dict[str, int] = {}
+        moods: dict[str, int] = {}
+        reference_tags: dict[str, int] = {}
+        book_ids: set[str] = set()
+        chunk_count = 0
+
+        def add_value(counter: dict[str, int], value: Any) -> None:
+            if isinstance(value, str) and value.strip():
+                normalized = value.strip()
+                counter[normalized] = counter.get(normalized, 0) + 1
+
+        for book, chunk in rows:
+            profile = (book.summary_json or {}).get("book_profile") or {}
+            # genre 使用精确匹配，保证 selector 只能获得当前语料实际存在的候选值。
+            if genre and profile.get("genre") != genre:
+                continue
+            book_ids.add(book.id)
+            chunk_count += 1
+            metadata = chunk.tag_metadata if isinstance(chunk.tag_metadata, dict) else {}
+            add_value(scene_types, metadata.get("scene_type"))
+            add_value(moods, metadata.get("mood"))
+            for tag in chunk.tags if isinstance(chunk.tags, list) else []:
+                add_value(reference_tags, tag)
+
+        def catalog_items(counter: dict[str, int]) -> list[dict[str, Any]]:
+            # 计数优先、字面值次序兜底，避免相同语料得到不稳定的选择器输入。
+            return [
+                {"value": value, "chunk_count": count}
+                for value, count in sorted(counter.items(), key=lambda item: (-item[1], item[0]))
+            ]
+
+        payload = {
+            "genre": genre or "",
+            "book_count": len(book_ids),
+            "chunk_count": chunk_count,
+            "total": chunk_count,
+            "scene_types": catalog_items(scene_types),
+            "moods": catalog_items(moods),
+            "reference_tags": catalog_items(reference_tags),
+        }
+        logger.info(
+            "参考标签目录完成: genre_filtered=%s, books=%d, chunks=%d, "
+            "scene_types=%d, moods=%d, reference_tags=%d, elapsed_ms=%.2f",
+            bool(genre),
+            payload["book_count"],
+            payload["chunk_count"],
+            len(payload["scene_types"]),
+            len(payload["moods"]),
+            len(payload["reference_tags"]),
+            (time.perf_counter() - started_at) * 1000,
+        )
+        return payload
 
     async def search_plot_patterns(
         self,

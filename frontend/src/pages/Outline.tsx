@@ -5,6 +5,7 @@ import { useStore } from '../store';
 import { useOutlineSync } from '../store/hooks';
 import { cardStyles } from '../components/CardStyles';
 import { SSEPostClient } from '../utils/sseClient';
+import LLMConfigSelector from '../components/LLMConfigSelector';
 
 const { TextArea } = Input;
 
@@ -155,6 +156,7 @@ export default function Outline() {
     requirements?: string;
     provider?: string;
     model?: string;
+    llm_config_id?: string;
     mode?: 'auto' | 'new' | 'continue';
     story_direction?: string;
     plot_stage?: 'development' | 'climax' | 'ending';
@@ -186,7 +188,8 @@ export default function Outline() {
         story_direction: values.story_direction,
         plot_stage: values.plot_stage || 'development',
         provider: values.provider,
-        model: values.model
+        model: values.model,
+        llm_config_id: values.llm_config_id,
       };
       
       // 使用SSE客户端
@@ -355,6 +358,10 @@ export default function Outline() {
 
                   <Form.Item label="其他要求" name="requirements">
                     <TextArea rows={2} placeholder="其他特殊要求（可选）" />
+                  </Form.Item>
+
+                  <Form.Item label="本次使用的模型" name="llm_config_id">
+                    <LLMConfigSelector />
                   </Form.Item>
                 </>
               );

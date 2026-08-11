@@ -9,6 +9,7 @@ import { SSELoadingOverlay } from '../components/SSELoadingOverlay';
 import type { Character, CharacterUpdate } from '../types';
 import { characterApi } from '../services/api';
 import { SSEPostClient } from '../utils/sseClient';
+import LLMConfigSelector from '../components/LLMConfigSelector';
 
 const { Title } = Typography;
 
@@ -52,7 +53,7 @@ export default function Characters() {
     }
   };
 
-  const handleGenerate = async (values: { name?: string; role_type: string; background?: string }) => {
+  const handleGenerate = async (values: { name?: string; role_type: string; background?: string; llm_config_id?: string }) => {
     try {
       setIsGenerating(true);
       setProgress(0);
@@ -65,6 +66,7 @@ export default function Characters() {
           name: values.name,
           role_type: values.role_type,
           background: values.background,
+          llm_config_id: values.llm_config_id,
         },
         {
           onProgress: (msg, prog) => {
@@ -104,6 +106,7 @@ export default function Characters() {
     organization_type?: string;
     background?: string;
     requirements?: string;
+    llm_config_id?: string;
   }) => {
     try {
       setIsGenerating(true);
@@ -118,6 +121,7 @@ export default function Characters() {
           organization_type: values.organization_type,
           background: values.background,
           requirements: values.requirements,
+          llm_config_id: values.llm_config_id,
         },
         {
           onProgress: (msg, prog) => {
@@ -244,6 +248,9 @@ export default function Characters() {
           <Form.Item label="背景设定" name="background">
             <TextArea rows={3} placeholder="简要描述角色背景和故事环境..." />
           </Form.Item>
+          <Form.Item label="本次使用的模型" name="llm_config_id">
+            <LLMConfigSelector />
+          </Form.Item>
         </Form>
       ),
       okText: '生成',
@@ -279,6 +286,9 @@ export default function Characters() {
           </Form.Item>
           <Form.Item label="其他要求" name="requirements">
             <TextArea rows={2} placeholder="其他特殊要求..." />
+          </Form.Item>
+          <Form.Item label="本次使用的模型" name="llm_config_id">
+            <LLMConfigSelector />
           </Form.Item>
         </Form>
       ),

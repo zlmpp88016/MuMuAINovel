@@ -148,6 +148,29 @@ def test_character_archetypes_remove_source_names(settings) -> None:
     assert "李四" not in serialized
 
 
+def test_reference_tag_catalog_uses_completed_metadata_and_stable_counts(settings) -> None:
+    service = _make_service(settings)
+
+    catalog = service.get_reference_tag_catalog(genre="悬疑")
+
+    assert catalog["book_count"] == 2
+    assert catalog["chunk_count"] == 3
+    assert catalog["scene_types"] == [
+        {"value": "对峙", "chunk_count": 1},
+        {"value": "调查", "chunk_count": 1},
+        {"value": "追逐", "chunk_count": 1},
+    ]
+    assert catalog["moods"] == [
+        {"value": "紧张", "chunk_count": 2},
+        {"value": "震惊", "chunk_count": 1},
+    ]
+    assert catalog["reference_tags"] == [
+        {"value": "冲突", "chunk_count": 2},
+        {"value": "伏笔", "chunk_count": 1},
+    ]
+    assert service.get_reference_tag_catalog(genre="科幻")["chunk_count"] == 0
+
+
 def test_foreshadow_pair_requires_earlier_plant_and_later_payoff(settings) -> None:
     service = _make_service(settings)
 

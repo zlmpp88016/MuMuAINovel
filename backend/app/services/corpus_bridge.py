@@ -7,12 +7,14 @@ import hashlib
 import json
 import time
 from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logger import get_logger
+from app.config import settings
 
 
 logger = get_logger(__name__)
@@ -22,6 +24,14 @@ GLOBAL_CORPUS_USER_ID = "__global__"
 CORPUS_TOOL_TIMEOUT_SECONDS = 3.0
 CORPUS_CACHE_TTL_SECONDS = 60.0
 CORPUS_CACHE_MAX_ENTRIES = 128
+
+
+@dataclass(frozen=True)
+class ChapterReferenceResult:
+    """将 Prompt 专用上下文与可安全写日志的诊断数据隔离。"""
+
+    context: str
+    trace: dict[str, Any]
 
 
 class CorpusBridge:
@@ -40,34 +50,201 @@ class CorpusBridge:
         scene_type: str | None = None,
         mood: str | None = None,
         genre: str | None = None,
+        style_tags: list[str] | None = None,
         limit: int = 5,
     ) -> str:
-        """返回用于生成章节的格式化语料参考。"""
-        query = chapter_outline.strip()
-        if not query:
-            return ""
-        passages, style_profile = await self._call_tools(
-            [
-                (
-                    "corpus_search_reference_passages",
-                    {
-                        "query": query,
-                        "scene_type": scene_type,
-                        "mood": mood,
-                        "genre": genre,
-                        "limit": limit,
-                    },
-                ),
-                (
-                    "corpus_get_style_profile",
-                    {"genre": genre, "mood": mood, "sample": 3},
-                ),
-            ]
+        """返回用于生成章节的格式化语料参考，兼容原有字符串调用方。"""
+        result = await self.get_reference_for_chapter_with_trace(
+            chapter_outline=chapter_outline,
+            scene_type=scene_type,
+            mood=mood,
+            genre=genre,
+            style_tags=style_tags,
+            limit=limit,
         )
-        context = self._format_chapter_context(passages, style_profile)
-        if context:
-            logger.info("语料库章节上下文已格式化：字符数=%d", len(context))
-        return context
+        return result.context
+
+    async def get_reference_for_chapter_with_trace(
+        self,
+        chapter_outline: str,
+        scene_type: str | None = None,
+        mood: str | None = None,
+        genre: str | None = None,
+        style_tags: list[str] | None = None,
+        limit: int = 5,
+        ai_service: Any | None = None,
+    ) -> ChapterReferenceResult:
+        """显式编排目录、受限选择与回退，并返回不含正文的审计 trace。"""
+        started_at = time.perf_counter()
+        query = chapter_outline.strip()
+        trace: dict[str, Any] = {
+            "catalog_status": "skipped",
+            "selector_status": "disabled",
+            "requested_tags": list(style_tags or []),
+            "selected_tags": [],
+            "selected_scene_type": scene_type,
+            "selected_mood": mood,
+            "attempts": [],
+            "mcp_methods": [],
+            "passage_count": 0,
+            "style_profile_count": 0,
+            "template_injected": False,
+            "fallback_stage": "empty_query",
+        }
+        if not query:
+            trace["elapsed_ms"] = round((time.perf_counter() - started_at) * 1000, 1)
+            return ChapterReferenceResult(context="", trace=trace)
+
+        catalog = await self._call_tool("corpus_list_reference_tag_catalog", {"genre": genre})
+        trace["mcp_methods"].append("corpus_list_reference_tag_catalog")
+        if catalog:
+            trace["catalog_status"] = "hit"
+            trace["corpus_version"] = catalog.get("corpus_version")
+            trace["catalog_counts"] = {
+                key: len(catalog.get(key, []))
+                for key in ("scene_types", "moods", "reference_tags")
+                if isinstance(catalog.get(key), list)
+            }
+            selected = self._validate_catalog_selection(
+                catalog,
+                scene_type=scene_type,
+                mood=mood,
+                style_tags=style_tags,
+            )
+            trace.update(selected)
+            if getattr(settings, "corpus_reference_tag_selector_enabled", False) and ai_service is not None:
+                selected_by_model = await self._select_catalog_tags(ai_service, catalog, query)
+                if selected_by_model is None:
+                    trace["selector_status"] = "fallback"
+                else:
+                    trace["selector_status"] = "accepted"
+                    trace.update(self._validate_catalog_selection(catalog, **selected_by_model))
+        else:
+            trace["catalog_status"] = "unavailable"
+
+        # 每一层只移除一个限制；无论目录或严格过滤是否失败，最后均回到语义基线。
+        selected_tags = trace["selected_tags"]
+        selected_scene = trace["selected_scene_type"]
+        selected_mood = trace["selected_mood"]
+        attempts = [
+            ("strict", selected_scene, selected_mood, selected_tags, genre),
+            ("drop_reference_tags", selected_scene, selected_mood, [], genre),
+            ("drop_mood", selected_scene, None, [], genre),
+            ("drop_scene_type", None, None, [], genre),
+            ("semantic_baseline", None, None, [], None),
+        ]
+        passages: list[dict[str, Any]] = []
+        matched_stage = "semantic_baseline"
+        for stage, attempt_scene, attempt_mood, attempt_tags, attempt_genre in attempts:
+            payload = await self._call_tool(
+                "corpus_search_reference_passages",
+                {
+                    "query": query,
+                    "scene_type": attempt_scene,
+                    "mood": attempt_mood,
+                    "style_tags": attempt_tags or None,
+                    "genre": attempt_genre,
+                    "limit": limit,
+                },
+            )
+            trace["mcp_methods"].append("corpus_search_reference_passages")
+            attempt_passages = self._extract_payload(payload).get("passages", [])
+            trace["attempts"].append(
+                {
+                    "stage": stage,
+                    "scene_type": attempt_scene,
+                    "mood": attempt_mood,
+                    "reference_tags": list(attempt_tags),
+                    "genre": attempt_genre,
+                    "hit_count": len(attempt_passages) if isinstance(attempt_passages, list) else 0,
+                }
+            )
+            if isinstance(attempt_passages, list) and attempt_passages:
+                passages = attempt_passages
+                matched_stage = stage
+                break
+
+        style_profile = await self._call_tool(
+            "corpus_get_style_profile",
+            {"genre": genre, "mood": selected_mood, "sample": 3},
+        )
+        trace["mcp_methods"].append("corpus_get_style_profile")
+        context = self._format_chapter_context({"passages": passages}, style_profile)
+        trace["passage_count"] = len(passages)
+        trace["style_profile_count"] = len(self._extract_payload(style_profile).get("profiles", []))
+        trace["template_injected"] = bool(passages)
+        trace["fallback_stage"] = matched_stage
+        trace["context_chars"] = len(context)
+        trace["elapsed_ms"] = round((time.perf_counter() - started_at) * 1000, 1)
+        logger.info(
+            "章节语料编排完成: catalog=%s, selector=%s, stage=%s, passages=%d, template=%s, elapsed_ms=%.1f",
+            trace["catalog_status"], trace["selector_status"], trace["fallback_stage"],
+            trace["passage_count"], trace["template_injected"], trace["elapsed_ms"],
+        )
+        return ChapterReferenceResult(context=context, trace=trace)
+
+    def _validate_catalog_selection(
+        self,
+        catalog: dict[str, Any],
+        scene_type: str | None = None,
+        mood: str | None = None,
+        style_tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """仅保留目录中的精确值，禁止模型自由文本直接进入 MCP 过滤器。"""
+        def values(key: str) -> set[str]:
+            return {
+                item.get("value") for item in catalog.get(key, [])
+                if isinstance(item, dict) and isinstance(item.get("value"), str)
+            }
+        scenes, moods, tags = values("scene_types"), values("moods"), values("reference_tags")
+        return {
+            "selected_scene_type": scene_type if scene_type in scenes else None,
+            "selected_mood": mood if mood in moods else None,
+            "selected_tags": [tag for tag in style_tags or [] if tag in tags],
+        }
+
+    async def _select_catalog_tags(
+        self,
+        ai_service: Any,
+        catalog: dict[str, Any],
+        chapter_outline: str,
+    ) -> dict[str, Any] | None:
+        """在独立短超时内让模型从目录选值；失败时返回 None 触发本地回退。"""
+        prompt = (
+            "只返回 JSON 对象，字段为 scene_type、mood、style_tags。"
+            "每个值必须从以下目录精确复制；无法判断时用 null 或 []。\n"
+            "章节目标仅用于选择，禁止在输出中复述：\n"
+            + chapter_outline[:2000]
+            + "\n候选目录：\n"
+            + json.dumps(
+                {
+                    "scene_types": catalog.get("scene_types", []),
+                    "moods": catalog.get("moods", []),
+                    "reference_tags": catalog.get("reference_tags", []),
+                },
+                ensure_ascii=False,
+            )
+        )
+        try:
+            response = await asyncio.wait_for(
+                ai_service.generate_text(
+                    prompt=prompt,
+                    temperature=0,
+                    max_tokens=getattr(settings, "corpus_reference_tag_selector_max_tokens", 180),
+                ),
+                timeout=max(0.1, float(getattr(settings, "corpus_reference_tag_selector_timeout_seconds", 1.5))),
+            )
+            parsed = json.loads(str(response.get("content") or "{}"))
+            if not isinstance(parsed, dict):
+                return None
+            tags = parsed.get("style_tags")
+            return {
+                "scene_type": parsed.get("scene_type"),
+                "mood": parsed.get("mood"),
+                "style_tags": tags if isinstance(tags, list) else [],
+            }
+        except (asyncio.TimeoutError, TypeError, ValueError, json.JSONDecodeError):
+            return None
 
     async def get_highlight_for_denoise(self, query: str, limit: int = 5) -> str:
         """返回用于 AI 文本去味的格式化高质量片段。"""

@@ -19,7 +19,7 @@ import json
 from app.user_manager import User
 from app.mcp.registry import mcp_registry
 from app.services.mcp_test_service import mcp_test_service
-from app.services.mcp_tool_service import mcp_tool_service
+from app.services.mcp_tool_service import GLOBAL_MCP_USER_ID, mcp_tool_service
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -34,6 +34,34 @@ def require_login(request: Request) -> User:
     return request.state.user
 
 
+def _to_plugin_response(plugin: MCPPlugin) -> MCPPluginResponse:
+    """ORM → 响应，附加 is_global。"""
+    return MCPPluginResponse.model_validate(plugin).model_copy(
+        update={"is_global": plugin.user_id == GLOBAL_MCP_USER_ID}
+    )
+
+
+async def _get_accessible_plugin(
+    plugin_id: str,
+    user: User,
+    db: AsyncSession,
+    *,
+    allow_global: bool = True,
+) -> MCPPlugin:
+    """按 id 取当前用户插件；可选允许读取全局默认插件。"""
+    result = await db.execute(
+        select(MCPPlugin).where(MCPPlugin.id == plugin_id)
+    )
+    plugin = result.scalar_one_or_none()
+    if not plugin:
+        raise HTTPException(status_code=404, detail="插件不存在")
+    if plugin.user_id == user.user_id:
+        return plugin
+    if allow_global and plugin.user_id == GLOBAL_MCP_USER_ID:
+        return plugin
+    raise HTTPException(status_code=404, detail="插件不存在")
+
+
 @router.get("", response_model=List[MCPPluginResponse])
 async def list_plugins(
     enabled_only: bool = Query(False, description="只返回启用的插件"),
@@ -42,23 +70,45 @@ async def list_plugins(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    获取用户的所有MCP插件
+    获取用户的 MCP 插件，并合并全局默认插件（用户同名覆盖全局）。
     """
-    query = select(MCPPlugin).where(MCPPlugin.user_id == user.user_id)
-    
+    query = select(MCPPlugin).where(
+        MCPPlugin.user_id.in_([user.user_id, GLOBAL_MCP_USER_ID])
+    )
+
     if enabled_only:
         query = query.where(MCPPlugin.enabled == True)
-    
+
     if category:
         query = query.where(MCPPlugin.category == category)
-    
+
     query = query.order_by(MCPPlugin.sort_order, MCPPlugin.created_at)
-    
+
     result = await db.execute(query)
-    plugins = result.scalars().all()
-    
-    logger.info(f"用户 {user.user_id} 查询插件列表，共 {len(plugins)} 个")
-    return plugins
+    rows = list(result.scalars().all())
+
+    # 用户同名插件覆盖全局；全局项排在用户项前便于展示
+    by_name: dict[str, MCPPlugin] = {}
+    for plugin in rows:
+        if plugin.user_id == GLOBAL_MCP_USER_ID:
+            by_name.setdefault(plugin.plugin_name, plugin)
+        else:
+            by_name[plugin.plugin_name] = plugin
+
+    plugins = sorted(
+        by_name.values(),
+        key=lambda p: (
+            0 if p.user_id == GLOBAL_MCP_USER_ID else 1,
+            p.sort_order or 0,
+            p.created_at or datetime.min,
+        ),
+    )
+
+    logger.info(
+        f"用户 {user.user_id} 查询插件列表，共 {len(plugins)} 个"
+        f"（含全局可读）"
+    )
+    return [_to_plugin_response(p) for p in plugins]
 
 
 @router.post("", response_model=MCPPluginResponse)
@@ -111,7 +161,7 @@ async def create_plugin(
         await db.refresh(plugin)
     
     logger.info(f"用户 {user.user_id} 创建插件: {plugin.plugin_name}")
-    return plugin
+    return _to_plugin_response(plugin)
 
 
 @router.post("/simple", response_model=MCPPluginResponse)
@@ -242,9 +292,9 @@ async def create_plugin_simple(
                 await db.refresh(plugin)
             
             logger.info(f"用户 {user.user_id} 通过简化配置创建插件: {plugin_name}")
-        
-        return plugin
-        
+
+        return _to_plugin_response(plugin)
+
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail=f"配置JSON格式错误: {str(e)}")
     except HTTPException:
@@ -261,20 +311,10 @@ async def get_plugin(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    获取插件详情
+    获取插件详情（含全局默认插件）
     """
-    result = await db.execute(
-        select(MCPPlugin).where(
-            MCPPlugin.id == plugin_id,
-            MCPPlugin.user_id == user.user_id
-        )
-    )
-    plugin = result.scalar_one_or_none()
-    
-    if not plugin:
-        raise HTTPException(status_code=404, detail="插件不存在")
-    
-    return plugin
+    plugin = await _get_accessible_plugin(plugin_id, user, db, allow_global=True)
+    return _to_plugin_response(plugin)
 
 
 @router.put("/{plugin_id}", response_model=MCPPluginResponse)
@@ -285,33 +325,26 @@ async def update_plugin(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    更新插件配置
+    更新插件配置（全局默认只读）
     """
-    result = await db.execute(
-        select(MCPPlugin).where(
-            MCPPlugin.id == plugin_id,
-            MCPPlugin.user_id == user.user_id
-        )
-    )
-    plugin = result.scalar_one_or_none()
-    
-    if not plugin:
-        raise HTTPException(status_code=404, detail="插件不存在")
-    
+    plugin = await _get_accessible_plugin(plugin_id, user, db, allow_global=True)
+    if plugin.user_id == GLOBAL_MCP_USER_ID:
+        raise HTTPException(status_code=403, detail="全局默认插件不可修改")
+
     # 更新字段
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(plugin, key, value)
-    
+
     await db.commit()
     await db.refresh(plugin)
-    
+
     # 如果插件已启用，重新加载
     if plugin.enabled:
         await mcp_registry.reload_plugin(plugin)
-    
+
     logger.info(f"用户 {user.user_id} 更新插件: {plugin.plugin_name}")
-    return plugin
+    return _to_plugin_response(plugin)
 
 
 @router.delete("/{plugin_id}")
@@ -321,26 +354,19 @@ async def delete_plugin(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    删除插件
+    删除插件（全局默认不可删）
     """
-    result = await db.execute(
-        select(MCPPlugin).where(
-            MCPPlugin.id == plugin_id,
-            MCPPlugin.user_id == user.user_id
-        )
-    )
-    plugin = result.scalar_one_or_none()
-    
-    if not plugin:
-        raise HTTPException(status_code=404, detail="插件不存在")
-    
+    plugin = await _get_accessible_plugin(plugin_id, user, db, allow_global=True)
+    if plugin.user_id == GLOBAL_MCP_USER_ID:
+        raise HTTPException(status_code=403, detail="全局默认插件不可删除")
+
     # 从注册表卸载
     await mcp_registry.unload_plugin(user.user_id, plugin.plugin_name)
-    
+
     # 删除数据库记录
     await db.delete(plugin)
     await db.commit()
-    
+
     logger.info(f"用户 {user.user_id} 删除插件: {plugin.plugin_name}")
     return {"message": "插件已删除", "plugin_name": plugin.plugin_name}
 
@@ -353,21 +379,14 @@ async def toggle_plugin(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    启用或禁用插件
+    启用或禁用插件（全局默认不可改）
     """
-    result = await db.execute(
-        select(MCPPlugin).where(
-            MCPPlugin.id == plugin_id,
-            MCPPlugin.user_id == user.user_id
-        )
-    )
-    plugin = result.scalar_one_or_none()
-    
-    if not plugin:
-        raise HTTPException(status_code=404, detail="插件不存在")
-    
+    plugin = await _get_accessible_plugin(plugin_id, user, db, allow_global=True)
+    if plugin.user_id == GLOBAL_MCP_USER_ID:
+        raise HTTPException(status_code=403, detail="全局默认插件不可启停")
+
     plugin.enabled = enabled
-    
+
     if enabled:
         # 启用：加载到注册表
         success = await mcp_registry.load_plugin(plugin)
@@ -381,13 +400,13 @@ async def toggle_plugin(
         # 禁用：从注册表卸载
         await mcp_registry.unload_plugin(user.user_id, plugin.plugin_name)
         plugin.status = "inactive"
-    
+
     await db.commit()
     await db.refresh(plugin)
-    
+
     action = "启用" if enabled else "禁用"
     logger.info(f"用户 {user.user_id} {action}插件: {plugin.plugin_name}")
-    return plugin
+    return _to_plugin_response(plugin)
 
 
 @router.post("/{plugin_id}/test", response_model=MCPTestResult)
@@ -398,21 +417,11 @@ async def test_plugin(
 ):
     """
     测试插件连接并调用工具验证功能
-    
+
     使用新的MCPTestService进行测试
     """
-    
-    result = await db.execute(
-        select(MCPPlugin).where(
-            MCPPlugin.id == plugin_id,
-            MCPPlugin.user_id == user.user_id
-        )
-    )
-    plugin = result.scalar_one_or_none()
-    
-    if not plugin:
-        raise HTTPException(status_code=404, detail="插件不存在")
-    
+    plugin = await _get_accessible_plugin(plugin_id, user, db, allow_global=True)
+
     if not plugin.enabled:
         return MCPTestResult(
             success=False,
@@ -577,32 +586,25 @@ async def get_plugin_tools(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    获取插件提供的工具列表
+    获取插件提供的工具列表（含全局默认）
     """
-    result = await db.execute(
-        select(MCPPlugin).where(
-            MCPPlugin.id == plugin_id,
-            MCPPlugin.user_id == user.user_id
-        )
-    )
-    plugin = result.scalar_one_or_none()
-    
-    if not plugin:
-        raise HTTPException(status_code=404, detail="插件不存在")
-    
+    plugin = await _get_accessible_plugin(plugin_id, user, db, allow_global=True)
+
     if not plugin.enabled:
         raise HTTPException(status_code=400, detail="插件未启用")
-    
+
+    owner_id = plugin.user_id
     try:
-        # 确保插件已加载
-        await _ensure_plugin_loaded(plugin, user.user_id)
-        
-        tools = await mcp_registry.get_plugin_tools(user.user_id, plugin.plugin_name)
-        
-        # 更新缓存
-        plugin.tools = tools
-        await db.commit()
-        
+        # 确保插件已加载（全局插件用其 owner_id 注册）
+        await _ensure_plugin_loaded(plugin, owner_id)
+
+        tools = await mcp_registry.get_plugin_tools(owner_id, plugin.plugin_name)
+
+        # 用户自有插件可写回 tools 缓存；全局只读不写库
+        if plugin.user_id == user.user_id:
+            plugin.tools = tools
+            await db.commit()
+
         return {
             "plugin_name": plugin.plugin_name,
             "tools": tools,
@@ -624,33 +626,24 @@ async def call_mcp_tool(
     """
     调用MCP工具
     """
-    # 获取插件
-    result = await db.execute(
-        select(MCPPlugin).where(
-            MCPPlugin.id == data.plugin_id,
-            MCPPlugin.user_id == user.user_id
-        )
-    )
-    plugin = result.scalar_one_or_none()
-    
-    if not plugin:
-        raise HTTPException(status_code=404, detail="插件不存在")
-    
+    plugin = await _get_accessible_plugin(data.plugin_id, user, db, allow_global=True)
+
     if not plugin.enabled:
         raise HTTPException(status_code=400, detail="插件未启用")
-    
+
+    owner_id = plugin.user_id
     try:
-        # 确保插件已加载
-        await _ensure_plugin_loaded(plugin, user.user_id)
-        
+        # 确保插件已加载（全局插件按 owner_id 注册）
+        await _ensure_plugin_loaded(plugin, owner_id)
+
         # 调用工具
         result = await mcp_registry.call_tool(
-            user.user_id,
+            owner_id,
             plugin.plugin_name,
             data.tool_name,
             data.arguments
         )
-        
+
         return {
             "success": True,
             "plugin_name": plugin.plugin_name,

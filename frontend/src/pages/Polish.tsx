@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, Input, Button, message, Space } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
 import { polishApi } from '../services/api';
+import LLMConfigSelector from '../components/LLMConfigSelector';
 
 const { TextArea } = Input;
 
@@ -9,6 +10,7 @@ export default function Polish() {
   const [originalText, setOriginalText] = useState('');
   const [polishedText, setPolishedText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [llmConfigId, setLLMConfigId] = useState<string | undefined>();
 
   const handlePolish = async () => {
     if (!originalText.trim()) {
@@ -18,7 +20,7 @@ export default function Polish() {
 
     try {
       setLoading(true);
-      const result = await polishApi.polishText({ text: originalText });
+      const result = await polishApi.polishText({ text: originalText, llm_config_id: llmConfigId });
       setPolishedText(result.polished_text);
       message.success('AI去味完成');
     } catch {
@@ -51,6 +53,10 @@ export default function Polish() {
             开始去味
           </Button>
         }>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 6, fontWeight: 500 }}>本次使用的模型</div>
+            <LLMConfigSelector value={llmConfigId} onChange={setLLMConfigId} disabled={loading} />
+          </div>
           <TextArea
             rows={10}
             placeholder="粘贴或输入需要去味的文本..."

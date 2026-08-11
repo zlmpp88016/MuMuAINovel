@@ -11,12 +11,14 @@ test('确认生成时传递裁剪后的一次性 Prompt', () => {
     styleId: 3,
     targetWordCount: 2500,
     oneTimePrompt: '  加强雨夜的悬疑氛围。\n',
+    llmConfigId: 'config-chapter',
   });
 
   assert.deepEqual(request, {
     style_id: 3,
     target_word_count: 2500,
     one_time_prompt: '加强雨夜的悬疑氛围。',
+    llm_config_id: 'config-chapter',
   });
 });
 

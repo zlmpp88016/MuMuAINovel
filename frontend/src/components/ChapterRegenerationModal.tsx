@@ -22,6 +22,7 @@ import {
   CloseCircleOutlined
 } from '@ant-design/icons';
 import { ssePost } from '../utils/sseClient';
+import LLMConfigSelector from './LLMConfigSelector';
 
 const { TextArea } = Input;
 const { Panel } = Collapse;
@@ -130,7 +131,8 @@ const ChapterRegenerationModal: React.FC<ChapterRegenerationModalProps> = ({
         },
         style_id: values.style_id,
         target_word_count: values.target_word_count,
-        focus_areas: values.focus_areas || []
+        focus_areas: values.focus_areas || [],
+        llm_config_id: values.llm_config_id,
       };
 
       let accumulatedContent = '';
@@ -389,6 +391,10 @@ const ChapterRegenerationModal: React.FC<ChapterRegenerationModalProps> = ({
               tooltip="生成内容的目标字数，实际字数可能有±20%的浮动"
             >
               <InputNumber min={500} max={10000} step={500} style={{ width: '100%' }} />
+            </Form.Item>
+
+            <Form.Item name="llm_config_id" label="本次使用的模型">
+              <LLMConfigSelector />
             </Form.Item>
 
           </Panel>

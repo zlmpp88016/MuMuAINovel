@@ -15,6 +15,7 @@ from app.services.ai_service import create_user_ai_service
 from app.schemas.mcp_plugin import MCPTestResult
 from app.logger import get_logger
 from app.user_manager import User
+from app.utils.json_schema import normalize_json_schema_for_function_calling
 
 logger = get_logger(__name__)
 
@@ -108,16 +109,20 @@ class MCPTestService:
             测试结果
         """
         start_time = time.time()
-        
+
+        # 全局插件的会话以 plugin.user_id（GLOBAL_MCP_USER_ID）为命名空间注册，
+        # 必须用 plugin.user_id 作为运行时 user_id，否则 get_client/call_tool 查不到会话
+        runtime_user_id = plugin.user_id or user.user_id
+
         try:
             # 1. 先进行连接测试
-            connection_result = await self.test_plugin_connection(plugin, user.user_id)
-            
+            connection_result = await self.test_plugin_connection(plugin, runtime_user_id)
+
             if not connection_result.success:
                 return connection_result
-            
+
             # 2. 获取工具列表
-            tools = await mcp_registry.get_plugin_tools(user.user_id, plugin.plugin_name)
+            tools = await mcp_registry.get_plugin_tools(runtime_user_id, plugin.plugin_name)
             
             if not tools:
                 return MCPTestResult(
@@ -232,7 +237,7 @@ class MCPTestService:
             call_start = time.time()
             try:
                 tool_result = await mcp_registry.call_tool(
-                    user.user_id,
+                    runtime_user_id,
                     plugin.plugin_name,
                     tool_name,
                     test_arguments
@@ -314,7 +319,9 @@ class MCPTestService:
                 }
             }
             if "inputSchema" in tool:
-                openai_tool["function"]["parameters"] = tool["inputSchema"]
+                openai_tool["function"]["parameters"] = normalize_json_schema_for_function_calling(
+                    tool["inputSchema"]
+                )
             openai_tools.append(openai_tool)
         return openai_tools
 

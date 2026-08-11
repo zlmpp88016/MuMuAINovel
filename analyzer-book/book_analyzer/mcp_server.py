@@ -209,6 +209,19 @@ async def corpus_get_style_profile(
 
 
 @mcp.tool()
+@_log_mcp_interface("获取参考标签目录")
+def corpus_list_reference_tag_catalog(genre: str | None = None) -> dict[str, Any]:
+    """返回当前完成语料中可精确选择的场景、情绪和参考标签。"""
+    payload = book_service.get_reference_tag_catalog(genre=genre)
+    return {
+        "schema_version": MCP_SCHEMA_VERSION,
+        "corpus_version": book_service.get_corpus_version(),
+        "filters_applied": {"genre": genre} if genre else {},
+        **payload,
+    }
+
+
+@mcp.tool()
 @_log_mcp_interface("检索情节模式")
 async def corpus_search_plot_patterns(
     query: QueryText,

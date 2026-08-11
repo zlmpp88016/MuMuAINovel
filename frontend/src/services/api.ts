@@ -30,6 +30,11 @@ import type {
   GenerateOutlineResponse,
   Settings,
   SettingsUpdate,
+  LLMConfiguration,
+  LLMConfigurationCreate,
+  LLMConfigurationUpdate,
+  LLMConfigurationConnectionRequest,
+  LLMModuleBindingsResponse,
   WritingStyle,
   WritingStyleCreate,
   WritingStyleUpdate,
@@ -177,7 +182,52 @@ export const settingsApi = {
   
   deleteSettings: () => api.delete<unknown, { message: string; user_id: string }>('/settings'),
   
-  getAvailableModels: (params: { api_key: string; api_base_url: string; provider: string }) =>
+  getLLMConfigurations: () =>
+    api.get<unknown, LLMConfiguration[]>('/settings/llm-configurations'),
+
+  createLLMConfiguration: (data: LLMConfigurationCreate) =>
+    api.post<unknown, LLMConfiguration>('/settings/llm-configurations', data),
+
+  updateLLMConfiguration: (id: string, data: LLMConfigurationUpdate) =>
+    api.put<unknown, LLMConfiguration>(`/settings/llm-configurations/${id}`, data),
+
+  deleteLLMConfiguration: (id: string) =>
+    api.delete<unknown, { message: string; id: string }>(`/settings/llm-configurations/${id}`),
+
+  getLLMBindings: () =>
+    api.get<unknown, LLMModuleBindingsResponse>('/settings/llm-bindings'),
+
+  updateLLMBindings: (bindings: Record<string, string | null>) =>
+    api.put<unknown, LLMModuleBindingsResponse>('/settings/llm-bindings', { bindings }),
+
+  testLLMConfiguration: (data: LLMConfigurationConnectionRequest) =>
+    api.post<unknown, {
+      success: boolean;
+      message: string;
+      response_time_ms?: number;
+      response_preview?: string;
+      error?: string;
+      error_type?: string;
+      suggestions?: string[];
+    }>('/settings/llm-configurations/test', data),
+
+  testSavedLLMConfiguration: (id: string) =>
+    api.post<unknown, {
+      success: boolean;
+      message: string;
+      response_time_ms?: number;
+      response_preview?: string;
+      error?: string;
+      error_type?: string;
+      suggestions?: string[];
+    }>(`/settings/llm-configurations/${id}/test`, {}),
+
+  getAvailableModels: (params: {
+    api_key?: string;
+    api_base_url?: string;
+    provider?: string;
+    config_id?: string;
+  }) =>
     api.get<unknown, { provider: string; models: Array<{ value: string; label: string; description: string }>; count?: number }>('/settings/models', { params }),
   
   testApiConnection: (params: { api_key: string; api_base_url: string; provider: string; llm_model: string }) =>
@@ -422,6 +472,7 @@ export const wizardStreamApi = {
       character_count?: number;
       provider?: string;
       model?: string;
+      llm_config_id?: string;
     },
     options?: SSEClientOptions
   ) => ssePost<WorldBuildingResponse>(
@@ -440,6 +491,7 @@ export const wizardStreamApi = {
       requirements?: string;
       provider?: string;
       model?: string;
+      llm_config_id?: string;
     },
     options?: SSEClientOptions
   ) => ssePost<GenerateCharactersResponse>(
@@ -457,6 +509,7 @@ export const wizardStreamApi = {
       requirements?: string;
       provider?: string;
       model?: string;
+      llm_config_id?: string;
     },
     options?: SSEClientOptions
   ) => ssePost<GenerateOutlineResponse>(
@@ -472,6 +525,7 @@ export const wizardStreamApi = {
       location?: string;
       atmosphere?: string;
       rules?: string;
+      llm_config_id?: string;
     },
     options?: SSEClientOptions
   ) => ssePost<WorldBuildingResponse>(
@@ -485,6 +539,7 @@ export const wizardStreamApi = {
     data?: {
       provider?: string;
       model?: string;
+      llm_config_id?: string;
     },
     options?: SSEClientOptions
   ) => ssePost<WorldBuildingResponse>(

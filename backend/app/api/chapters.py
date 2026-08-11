@@ -43,6 +43,7 @@ from app.services.chapter_regenerator import ChapterRegenerator
 from app.logger import get_logger
 from app.api.settings import get_user_ai_service
 from app.utils.chapter_generation_logging import (
+    log_chapter_corpus_trace,
     log_chapter_generation_step,
     log_final_chapter_prompt,
 )
@@ -1236,13 +1237,21 @@ async def generate_chapter_content_stream(
                     enable_mcp=enable_mcp,
                 )
                 if enable_mcp and current_user_id:
-                    corpus_context = await CorpusBridge(
+                    # 语料失败不影响章节生成；trace 只用于关联本章的安全诊断日志。
+                    corpus_result = await CorpusBridge(
                         current_user_id,
                         db_session,
-                    ).get_reference_for_chapter(
+                    ).get_reference_for_chapter_with_trace(
                         chapter_outline=chapter_outline_text,
                         genre=project.genre or '',
                         limit=5,
+                        ai_service=ai_service,
+                    )
+                    corpus_context = corpus_result.context
+                    log_chapter_corpus_trace(
+                        logger,
+                        chapter_id=chapter_id,
+                        trace=corpus_result.trace,
                     )
                 log_chapter_generation_step(
                     logger,
@@ -2409,10 +2418,18 @@ async def generate_single_chapter_for_batch(
     
     # 生成提示词
     chapter_outline_text = outline.content if outline else chapter.summary or '暂无大纲'
-    corpus_context = await CorpusBridge(user_id, db_session).get_reference_for_chapter(
+    # 批量路径复用同一编排与脱敏日志，避免两类章节生成产生不同的回退语义。
+    corpus_result = await CorpusBridge(user_id, db_session).get_reference_for_chapter_with_trace(
         chapter_outline=chapter_outline_text,
         genre=project.genre or '',
         limit=5,
+        ai_service=ai_service,
+    )
+    corpus_context = corpus_result.context
+    log_chapter_corpus_trace(
+        logger,
+        chapter_id=chapter.id,
+        trace=corpus_result.trace,
     )
     if previous_content:
         prompt = prompt_service.get_chapter_generation_with_context_prompt(

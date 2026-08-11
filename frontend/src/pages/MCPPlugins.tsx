@@ -84,8 +84,12 @@ export default function MCPPluginsPage() {
   };
 
   const handleEdit = (plugin: MCPPlugin) => {
+    if (plugin.is_global) {
+      message.warning('全局默认插件不可编辑');
+      return;
+    }
     setEditingPlugin(plugin);
-    
+
     // 重构为标准MCP配置格式
     const mcpConfig: any = {
       mcpServers: {
@@ -113,6 +117,10 @@ export default function MCPPluginsPage() {
   };
 
   const handleDelete = (plugin: MCPPlugin) => {
+    if (plugin.is_global) {
+      message.warning('全局默认插件不可删除');
+      return;
+    }
     Modal.confirm({
       title: '删除插件',
       content: `确定要删除插件 "${plugin.display_name || plugin.plugin_name}" 吗？`,
@@ -132,6 +140,10 @@ export default function MCPPluginsPage() {
   };
 
   const handleToggle = async (plugin: MCPPlugin, enabled: boolean) => {
+    if (plugin.is_global) {
+      message.warning('全局默认插件不可启停');
+      return;
+    }
     try {
       await mcpPluginApi.togglePlugin(plugin.id, enabled);
       message.success(enabled ? '插件已启用' : '插件已禁用');
@@ -477,6 +489,9 @@ export default function MCPPluginsPage() {
                           <Text strong style={{ fontSize: isMobile ? '14px' : '16px' }}>
                             {plugin.display_name || plugin.plugin_name}
                           </Text>
+                          {plugin.is_global && (
+                            <Tag color="gold">全局默认</Tag>
+                          )}
                           {getStatusTag(plugin)}
                           <Tag color={plugin.plugin_type === 'http' ? 'blue' : 'cyan'}>
                             {plugin.plugin_type?.toUpperCase() || 'UNKNOWN'}
@@ -549,9 +564,18 @@ export default function MCPPluginsPage() {
                     </div>
 
                     <Space size="small" wrap>
-                      <Tooltip title={plugin.enabled ? '禁用插件' : '启用插件'}>
+                      <Tooltip
+                        title={
+                          plugin.is_global
+                            ? '全局默认插件不可启停'
+                            : plugin.enabled
+                              ? '禁用插件'
+                              : '启用插件'
+                        }
+                      >
                         <Switch
                           checked={plugin.enabled}
+                          disabled={!!plugin.is_global}
                           onChange={(checked) => handleToggle(plugin, checked)}
                           size={isMobile ? 'small' : 'default'}
                           style={{
@@ -578,21 +602,25 @@ export default function MCPPluginsPage() {
                           size={isMobile ? 'small' : 'middle'}
                         />
                       </Tooltip>
-                      <Tooltip title="编辑">
-                        <Button
-                          icon={<EditOutlined />}
-                          onClick={() => handleEdit(plugin)}
-                          size={isMobile ? 'small' : 'middle'}
-                        />
-                      </Tooltip>
-                      <Tooltip title="删除">
-                        <Button
-                          danger
-                          icon={<DeleteOutlined />}
-                          onClick={() => handleDelete(plugin)}
-                          size={isMobile ? 'small' : 'middle'}
-                        />
-                      </Tooltip>
+                      {!plugin.is_global && (
+                        <>
+                          <Tooltip title="编辑">
+                            <Button
+                              icon={<EditOutlined />}
+                              onClick={() => handleEdit(plugin)}
+                              size={isMobile ? 'small' : 'middle'}
+                            />
+                          </Tooltip>
+                          <Tooltip title="删除">
+                            <Button
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => handleDelete(plugin)}
+                              size={isMobile ? 'small' : 'middle'}
+                            />
+                          </Tooltip>
+                        </>
+                      )}
                     </Space>
                   </div>
                 </Card>

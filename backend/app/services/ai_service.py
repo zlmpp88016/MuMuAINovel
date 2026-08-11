@@ -9,6 +9,24 @@ import json
 
 logger = get_logger(__name__)
 
+OPENAI_COMPATIBLE_PROVIDERS = {
+    "openai",
+    "azure",
+    "custom",
+    "openai-compatible",
+    "deepseek",
+    "siliconflow",
+    "moonshot",
+    "qwen",
+    "ollama",
+}
+
+
+def is_openai_compatible_provider(provider: Optional[str]) -> bool:
+    """Return whether a provider uses the OpenAI chat-completions contract."""
+
+    return (provider or "").strip().lower() in OPENAI_COMPATIBLE_PROVIDERS
+
 
 class AIService:
     """AI服务统一接口 - 支持从用户设置或全局配置初始化"""
@@ -34,13 +52,19 @@ class AIService:
             default_max_tokens: 默认最大tokens，为None时使用全局配置
         """
         # 保存用户设置或使用全局配置
-        self.api_provider = api_provider or app_settings.default_ai_provider
+        self.api_provider = (api_provider or app_settings.default_ai_provider).strip().lower()
         self.default_model = default_model or app_settings.default_model
-        self.default_temperature = default_temperature or app_settings.default_temperature
-        self.default_max_tokens = default_max_tokens or app_settings.default_max_tokens
+        self.default_temperature = (
+            default_temperature if default_temperature is not None else app_settings.default_temperature
+        )
+        self.default_max_tokens = (
+            default_max_tokens if default_max_tokens is not None else app_settings.default_max_tokens
+        )
+
+        openai_compatible = is_openai_compatible_provider(self.api_provider)
         
         # 初始化OpenAI客户端
-        openai_key = api_key if api_provider == "openai" else app_settings.openai_api_key
+        openai_key = api_key if api_key is not None and openai_compatible else app_settings.openai_api_key
         if openai_key:
             try:
                 limits = httpx.Limits(
@@ -62,7 +86,7 @@ class AIService:
                     "http_client": http_client
                 }
                 
-                base_url = api_base_url if api_provider == "openai" else app_settings.openai_base_url
+                base_url = api_base_url if api_base_url is not None and openai_compatible else app_settings.openai_base_url
                 if base_url:
                     client_kwargs["base_url"] = base_url
                 
@@ -83,11 +107,11 @@ class AIService:
             self.openai_api_key = None
             self.openai_base_url = None
             # 只有当用户明确选择OpenAI作为提供商时才警告
-            if self.api_provider == "openai":
+            if openai_compatible:
                 logger.warning("⚠️ OpenAI API key未配置，但被设置为当前AI提供商")
         
         # 初始化Anthropic客户端
-        anthropic_key = api_key if api_provider == "anthropic" else app_settings.anthropic_api_key
+        anthropic_key = api_key if self.api_provider == "anthropic" and api_key is not None else app_settings.anthropic_api_key
         if anthropic_key:
             try:
                 limits = httpx.Limits(
@@ -109,7 +133,7 @@ class AIService:
                     "http_client": http_client
                 }
                 
-                base_url = api_base_url if api_provider == "anthropic" else app_settings.anthropic_base_url
+                base_url = api_base_url if self.api_provider == "anthropic" and api_base_url is not None else app_settings.anthropic_base_url
                 if base_url:
                     client_kwargs["base_url"] = base_url
                 
@@ -154,12 +178,12 @@ class AIService:
             - tool_calls: 工具调用列表（如果AI决定调用工具）
             - finish_reason: 完成原因
         """
-        provider = provider or self.api_provider
+        provider = (provider or self.api_provider).strip().lower()
         model = model or self.default_model
-        temperature = temperature or self.default_temperature
-        max_tokens = max_tokens or self.default_max_tokens
-        
-        if provider == "openai":
+        temperature = temperature if temperature is not None else self.default_temperature
+        max_tokens = max_tokens if max_tokens is not None else self.default_max_tokens
+
+        if is_openai_compatible_provider(provider):
             return await self._generate_openai_with_tools(
                 prompt, model, temperature, max_tokens, system_prompt, tools, tool_choice
             )
@@ -193,12 +217,12 @@ class AIService:
         生成：
             生成的文本片段
         """
-        provider = provider or self.api_provider
+        provider = (provider or self.api_provider).strip().lower()
         model = model or self.default_model
-        temperature = temperature or self.default_temperature
-        max_tokens = max_tokens or self.default_max_tokens
-        
-        if provider == "openai":
+        temperature = temperature if temperature is not None else self.default_temperature
+        max_tokens = max_tokens if max_tokens is not None else self.default_max_tokens
+
+        if is_openai_compatible_provider(provider):
             async for chunk in self._generate_openai_stream(
                 prompt, model, temperature, max_tokens, system_prompt
             ):
@@ -969,7 +993,7 @@ ai_service = AIService()
 def create_user_ai_service(
     api_provider: str,
     api_key: str,
-    api_base_url: str,
+    api_base_url: Optional[str],
     model_name: str,
     temperature: float,
     max_tokens: int

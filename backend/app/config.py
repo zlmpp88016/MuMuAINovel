@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     default_temperature: float = 0.7
     default_max_tokens: int = 2000
 
+    # 目录选择器默认关闭。开启后也只接受语料目录中的精确值，避免模型自由文本成为过滤条件。
+    corpus_reference_tag_selector_enabled: bool = False
+    corpus_reference_tag_selector_timeout_seconds: float = 1.5
+    corpus_reference_tag_selector_max_tokens: int = 180
+
     # Embedding模型配置
     embedding_provider: str = "local"  # "local" 本地模型 / "api" 外部API
     embedding_dim: int = 384  # 输出向量维度（384/768/1024/4096等），仅api模式生效

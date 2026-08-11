@@ -55,6 +55,7 @@ class OutlineGenerateRequest(BaseModel):
     requirements: Optional[str] = Field(None, description="其他特殊要求")
     provider: Optional[str] = Field(None, description="AI提供商")
     model: Optional[str] = Field(None, description="AI模型")
+    llm_config_id: Optional[str] = Field(None, description="LLM配置ID")
     
     # 续写相关参数
     mode: str = Field("auto", description="生成模式: auto(自动判断), new(全新生成), continue(续写)")
@@ -70,6 +71,7 @@ class ChapterOutlineGenerateRequest(BaseModel):
     context: Optional[str] = Field(None, description="额外上下文")
     provider: Optional[str] = Field(None, description="AI提供商")
     model: Optional[str] = Field(None, description="AI模型")
+    llm_config_id: Optional[str] = Field(None, description="LLM配置ID")
 
 
 class OutlineListResponse(BaseModel):

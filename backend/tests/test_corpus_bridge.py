@@ -232,3 +232,43 @@ def test_corpus_cache_key_normalizes_query_and_tracks_corpus_version() -> None:
     assert bridge._cache_aliases[first_key] != v1_cache_key
     assert v1_cache_key not in bridge._payload_cache
     assert bridge._get_cached_payload(first_key)["corpus_version"] == "v2"
+
+
+def test_chapter_reference_trace_uses_catalog_values_and_falls_back() -> None:
+    bridge = CorpusBridge("real-user", db_session=None)
+    search_calls: list[dict] = []
+
+    async def fake_call(tool_name: str, arguments: dict) -> dict:
+        if tool_name == "corpus_list_reference_tag_catalog":
+            return {
+                "corpus_version": "v1",
+                "scene_types": [{"value": "调查", "chunk_count": 1}],
+                "moods": [{"value": "紧张", "chunk_count": 1}],
+                "reference_tags": [{"value": "伏笔", "chunk_count": 1}],
+            }
+        if tool_name == "corpus_search_reference_passages":
+            search_calls.append(arguments)
+            if len(search_calls) == 2:
+                return {"passages": [{"book_id": "book-1", "content": "参考片段"}]}
+            return {"passages": []}
+        return {"profiles": []}
+
+    bridge._call_tool = fake_call
+    result = asyncio.run(
+        bridge.get_reference_for_chapter_with_trace(
+            chapter_outline="需要紧张调查场景",
+            scene_type="调查",
+            mood="紧张",
+            style_tags=["伏笔", "目录外标签"],
+        )
+    )
+
+    assert result.trace["selected_tags"] == ["伏笔"]
+    assert result.trace["fallback_stage"] == "drop_reference_tags"
+    assert result.trace["template_injected"] is True
+    assert result.trace["mcp_methods"][:2] == [
+        "corpus_list_reference_tag_catalog",
+        "corpus_search_reference_passages",
+    ]
+    assert search_calls[0]["style_tags"] == ["伏笔"]
+    assert search_calls[1]["style_tags"] is None

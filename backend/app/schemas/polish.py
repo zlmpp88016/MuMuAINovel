@@ -14,6 +14,7 @@ class PolishRequest(BaseModel):
     project_id: Optional[str] = Field(None, description="项目ID（可选，用于记录历史）")
     provider: Optional[str] = Field(None, description="AI提供商")
     model: Optional[str] = Field(None, description="AI模型")
+    llm_config_id: Optional[str] = Field(None, description="LLM配置ID")
     temperature: Optional[float] = Field(
         0.8,
         ge=0,

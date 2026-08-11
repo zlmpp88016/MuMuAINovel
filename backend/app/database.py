@@ -21,7 +21,7 @@ from app.models import (
     Settings, WritingStyle, ProjectDefaultStyle,
     RelationshipType, CharacterRelationship, Organization, OrganizationMember,
     StoryMemory, PlotAnalysis, AnalysisTask, BatchGenerationTask,
-    RegenerationTask
+    RegenerationTask, LLMConfiguration, LLMModuleBinding
 )
 
 # 引擎缓存：每个用户一个引擎

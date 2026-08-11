@@ -1,8 +1,9 @@
 """HTTP MCP客户端 - 使用官方 MCP Python SDK 实现"""
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 from contextlib import asynccontextmanager
 
+from anyio import ClosedResourceError
 from mcp import ClientSession, types
 from mcp.client.streamable_http import streamablehttp_client
 from pydantic import AnyUrl
@@ -10,6 +11,8 @@ from pydantic import AnyUrl
 from app.logger import get_logger
 
 logger = get_logger(__name__)
+
+T = TypeVar("T")
 
 
 class MCPError(Exception):
@@ -98,6 +101,36 @@ class HTTPMCPClient:
         
         self._session = None
         self._initialized = False
+
+    async def _with_reconnect(
+        self,
+        operation_name: str,
+        fn: Callable[[], T]
+    ) -> T:
+        """
+        执行一次 MCP 会话操作；遇到连接已关闭时自动清理并重建一次。
+
+        服务端可能因空闲超时、重启或网络波动关闭底层流，而 self._session
+        对象仍残留。此时复用会立即抛 ClosedResourceError（耗时≈0）。本方法
+        捕获该错误并重建连接后重试一次，避免上层 3 次重试都命中死连接。
+        """
+        for attempt in (1, 2):
+            try:
+                await self._ensure_connected()
+                return await fn()
+            except ClosedResourceError as e:
+                if attempt == 1:
+                    logger.warning(
+                        "⚠️ %s 连接已关闭(%s)，清理并重建MCP连接后重试",
+                        operation_name,
+                        type(e).__name__,
+                    )
+                    await self._cleanup()
+                    continue
+                logger.error(
+                    "❌ %s 重建连接后仍失败: %s", operation_name, e,
+                )
+                raise
     
     async def initialize(self) -> Dict[str, Any]:
         """
@@ -117,10 +150,11 @@ class HTTPMCPClient:
             工具列表
         """
         try:
-            await self._ensure_connected()
-            
-            result = await self._session.list_tools()
-            
+            result = await self._with_reconnect(
+                "获取工具列表",
+                lambda: self._session.list_tools(),
+            )
+
             # 转换为字典格式
             tools = []
             for tool in result.tools:
@@ -155,16 +189,17 @@ class HTTPMCPClient:
         """
         started_at = asyncio.get_running_loop().time()
         try:
-            await self._ensure_connected()
-            
             logger.info(
                 "🔧 [MCP调用][HTTP请求] 开始 | 工具=%s | 参数字段=%s | 超时=%ss",
                 tool_name,
                 sorted(arguments),
                 self.timeout,
             )
-            
-            result = await self._session.call_tool(tool_name, arguments)
+
+            result = await self._with_reconnect(
+                "调用工具",
+                lambda: self._session.call_tool(tool_name, arguments),
+            )
 
             # 新版 MCP 结果可能同时包含结构化数据和文本回退。优先保留结构化
             # 内容，避免上层再次解析 JSON 文本或丢失返回字段。
@@ -219,10 +254,11 @@ class HTTPMCPClient:
             资源列表
         """
         try:
-            await self._ensure_connected()
-            
-            result = await self._session.list_resources()
-            
+            result = await self._with_reconnect(
+                "获取资源列表",
+                lambda: self._session.list_resources(),
+            )
+
             # 转换为字典格式
             resources = []
             for resource in result.resources:
@@ -252,10 +288,11 @@ class HTTPMCPClient:
             资源内容
         """
         try:
-            await self._ensure_connected()
-            
-            result = await self._session.read_resource(AnyUrl(uri))
-            
+            result = await self._with_reconnect(
+                "读取资源",
+                lambda: self._session.read_resource(AnyUrl(uri)),
+            )
+
             # 提取资源内容
             if result.contents:
                 content = result.contents[0]

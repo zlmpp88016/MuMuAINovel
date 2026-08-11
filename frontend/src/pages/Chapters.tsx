@@ -8,6 +8,7 @@ import type { Chapter, ChapterUpdate, ApiError, WritingStyle, AnalysisTask } fro
 import { cardStyles } from '../components/CardStyles';
 import ChapterAnalysis from '../components/ChapterAnalysis';
 import { SSELoadingOverlay } from '../components/SSELoadingOverlay';
+import LLMConfigSelector from '../components/LLMConfigSelector';
 
 const { TextArea } = Input;
 
@@ -25,6 +26,7 @@ export default function Chapters() {
   const [writingStyles, setWritingStyles] = useState<WritingStyle[]>([]);
   const [selectedStyleId, setSelectedStyleId] = useState<number | undefined>();
   const [targetWordCount, setTargetWordCount] = useState<number>(3000);
+  const [llmConfigId, setLLMConfigId] = useState<string | undefined>();
   const [analysisVisible, setAnalysisVisible] = useState(false);
   const [analysisChapterId, setAnalysisChapterId] = useState<string | null>(null);
   // 分析任务状态管理
@@ -328,7 +330,8 @@ export default function Chapters() {
           setSingleChapterProgress(progressValue);
           setSingleChapterProgressMessage(progressMsg);
         },
-        oneTimePrompt
+        oneTimePrompt,
+        llmConfigId
       );
       
       message.success('AI创作成功，正在分析章节内容...');
@@ -534,6 +537,7 @@ export default function Chapters() {
     enableAnalysis: boolean;
     styleId?: number;
     targetWordCount?: number;
+    llmConfigId?: string;
   }) => {
     if (!currentProject?.id) return;
     
@@ -560,6 +564,7 @@ export default function Chapters() {
           enable_analysis: values.enableAnalysis,
           style_id: styleId,
           target_word_count: wordCount,
+          llm_config_id: values.llmConfigId || llmConfigId,
         }),
       });
       
@@ -1081,6 +1086,10 @@ export default function Chapters() {
             </div>
           </Form.Item>
 
+          <Form.Item label="本次使用的模型">
+            <LLMConfigSelector value={llmConfigId} onChange={setLLMConfigId} disabled={isGenerating} />
+          </Form.Item>
+
           <Form.Item label="章节内容" name="content">
             <TextArea
               ref={contentTextAreaRef}
@@ -1220,6 +1229,7 @@ export default function Chapters() {
               enableAnalysis: false,
               styleId: selectedStyleId,
               targetWordCount: 3000,
+              llmConfigId: undefined,
             }}
           >
             <Alert
@@ -1331,6 +1341,10 @@ export default function Chapters() {
                   </Space>
                 </Radio>
               </Radio.Group>
+            </Form.Item>
+
+            <Form.Item label="本次使用的模型" name="llmConfigId">
+              <LLMConfigSelector />
             </Form.Item>
 
             <Form.Item>

@@ -37,3 +37,12 @@ Auto-generated from project structure. Update manually as architecture evolves.
 ## Entries
 
 {empty section for spec-add entries}
+
+
+<spec-entry category="arch" keywords="mcp tags corpus retrieval" date="2026-07-27" sid="S-20260727-ipur" title="MCP 标签检索必须非阻塞回退" description="语料标签检索的非阻塞回退和编排边界" source="upgrade@d81a073">
+
+### MCP 标签检索必须非阻塞回退
+
+章节样例检索以章节大纲的语义召回为基线。标签目录和目录内精确标签选择仅用于提升精度；目录为空、标签缺失、选择超时或筛选零命中时，backend 必须逐级放宽标签条件并继续生成。依赖目录再检索的多跳流程由业务服务显式编排，不能依赖只保证首轮 tools 的通用模型工具循环。
+
+</spec-entry>
